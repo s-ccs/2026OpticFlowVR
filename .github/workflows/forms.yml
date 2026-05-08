@@ -1,0 +1,28 @@
+on:
+ push:
+  paths:
+    - project*.toml
+    - .github/workflows/forms.yml
+jobs:
+
+  ask-for-consent:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        language: 
+          - de
+          - en
+    steps:
+    
+      - name: checkout repo
+        uses: actions/checkout@v4
+      - name: Read project TOML file
+        id: read_toml
+        run: |
+          toml_content=$(cat project_*.toml  | base64 -w0)
+          echo "toml_content=$toml_content" >> $GITHUB_OUTPUT
+      - name: Generate Forms
+        uses: s-ccs/consentform_gh_action@main
+        with:
+         language: ${{ matrix.language }}
+         project_toml: ${{ steps.read_toml.outputs.toml_content }}

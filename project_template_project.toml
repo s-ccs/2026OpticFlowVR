@@ -1,0 +1,68 @@
+  # This is the project configuration file - This configuration can be customized for each project
+  
+  [AuthorsInfo]
+    authors = "John Doe, Lina Doe" # List of authors separated by commas
+    affiliation = "University of Stuttgart, University of Stuttgart" # Affiliation of the authors in the same order as authors
+    email = "john@gmail.com" # Contact email of the authors in the same order as authors
+  
+  [DataverseDataset]
+    title = "Convert XDF to BIDS" # Title of the  Dataverse dataset. This gets updated automatically by the project name.
+    datasetDescription = "This is a test project to set up the pipeline to convert XDF to BIDS." # Description of the dataset. This description will appear in the dataset.json file which then eventually gets displayed in the dataverse metadata
+    license = "MIT License" # License for the dataset, e.g. "CC0", "CC-BY-4.0", "ODC-By-1.0", "PDDL-1.0", "ODC-PDDL-1.0", "MIT License"
+    subject = ["Medicine, Health and Life Sciences","Engineering"] # List of subjects related to the dataset required for dataverse metadata
+    pid = '' # Persistent identifier for the dataset, e.g. DOI or Handle. This will be updated automatically after creating the dataset in dataverse.
+
+  [OtherFilesInfo]
+    otherFilesUsed = true # Set to true if you want to include other (non-eeg-files) files (experiment files, other modalities like eye tracking) in the dataset, else false
+    
+  # expectedOtherFiles: Dictionary format with regex patterns
+  # - The key is a regular expression to match source filenames in the project_other/.../beh/ folder
+  # - The value is a template path that includes {prefix} (e.g. sub-003_ses-002) and the target folder (beh/ or misc/)
+  # - Only files matching these patterns will be copied to the BIDS dataset
+  # the following is a sample configuration, you could also write it in short-hand notation: expectedOtherFiles={ ".*.edf"= "beh/{prefix}_physio.edf", ...}
+  
+  [OtherFilesInfo.expectedOtherFiles]
+    ".*.edf" = "misc/{prefix}_task-Default_physio.edf"
+    ".*.csv" = "misc/{prefix}_task-Default_beh.tsv"
+    ".*_labnotebook.tsv" = "misc/{prefix}_labnotebook.tsv"
+    ".*_participantform.tsv" = "misc/{prefix}_participantform.tsv"
+
+  
+  [FileSelection]
+    ignoreSubjects = ['sub-777'] # List of subjects to ignore during the conversion - Leave empty to include all subjects. Changing this value will not delete already existing subjects.
+    excludeTasks = ['sampletask'] # List of tasks to exclude from the conversion for all subjects - Leave empty to include all tasks. Changing this value will not delete already existing tasks.
+    
+  [BidsConfig]
+    anonymizationNumber = 123 # This is an anomization number that will be added to the recording date of all subjects.
+
+
+[Consentform]
+    pay_per_hour = 15
+	study_duration_hrs = 3
+
+    use_eeg = true
+    use_eyetracking = true
+	use_vr = false
+
+	study_purpose_de = """In dieser Studie untersuchen wir, wie Menschen Bilder wahrnehmen, indem wir die Gehirnaktivität mit EEG und die Augenbewegungen mit einem Eye-Tracker aufzeichnen."""
+	study_purpose_en = "In this study, we will investigate how humans perceive images by recording brain activity with EEG and eye movements using an eye-tracker."
+    
+	study_task_de =  "Es werden Ihnen verschiedene Bilder auf dem Monitor präsentiert. Ihre Aufgabe ist es, die Bilder frei zu erkunden."
+	study_task_en = "We will present different pictures on the screen. Your task is to freely explore these pictures."
+	
+	researcher_details_de = """Verantwortliche Person: Benedikt Ehinger  
+								Computational Cognitive Science (CCS)  
+								Institut für Visualisierung und Interaktive Systeme (VIS)   
+								Universität Stuttgart  
+								Universitätsstraße 32  
+								70569 Stuttgart  
+								E-mail: benedikt.ehinger@vis.uni-stuttgart.de"""
+	researcher_details_en = """Responsible Principal Investigator: Benedikt Ehinger  
+								Computational Cognitive Science (CCS)  
+								Institute for Visualisation and Interactive Systems (VIS)   
+								University of Stuttgart  
+								Universitätsstraße 32  
+								70569 Stuttgart  
+								E-mail: benedikt.ehinger@vis.uni-stuttgart.de"""
+
+	data_processing_contactperson = "Benedikt Ehinger (benedikt.ehinger@vis.uni-stuttgart.de)"
