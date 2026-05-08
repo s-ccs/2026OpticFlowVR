@@ -1,14 +1,14 @@
   # This is the project configuration file - This configuration can be customized for each project
   
   [AuthorsInfo]
-    authors = "John Doe, Lina Doe" # List of authors separated by commas
-    affiliation = "University of Stuttgart, University of Stuttgart" # Affiliation of the authors in the same order as authors
-    email = "john@gmail.com" # Contact email of the authors in the same order as authors
-  
+    authors = "Mila Bochkova, Martin Geiger"
+    affiliation = "University of Stuttgart, Germany"
+    email = "martin.geiger@vis.uni-stuttgart.de"
+
   [DataverseDataset]
-    title = "Convert XDF to BIDS" # Title of the  Dataverse dataset. This gets updated automatically by the project name.
-    datasetDescription = "This is a test project to set up the pipeline to convert XDF to BIDS." # Description of the dataset. This description will appear in the dataset.json file which then eventually gets displayed in the dataverse metadata
-    license = "MIT License" # License for the dataset, e.g. "CC0", "CC-BY-4.0", "ODC-By-1.0", "PDDL-1.0", "ODC-PDDL-1.0", "MIT License"
+    title = "2026OpticFlowVR"
+    datasetDescription = "Neural Effects of Optic Flow in the Absence of Eye Movements: An EEG Study"
+    license = "MIT License"
     subject = ["Medicine, Health and Life Sciences","Engineering"] # List of subjects related to the dataset required for dataverse metadata
     pid = '' # Persistent identifier for the dataset, e.g. DOI or Handle. This will be updated automatically after creating the dataset in dataverse.
 
@@ -38,18 +38,18 @@
 
 [Consentform]
     pay_per_hour = 15
-	study_duration_hrs = 3
+	  study_duration_hrs = 3
 
     use_eeg = true
     use_eyetracking = true
-	use_vr = false
+	  use_vr = true
 
-	study_purpose_de = """In dieser Studie untersuchen wir, wie Menschen Bilder wahrnehmen, indem wir die Gehirnaktivität mit EEG und die Augenbewegungen mit einem Eye-Tracker aufzeichnen."""
-	study_purpose_en = "In this study, we will investigate how humans perceive images by recording brain activity with EEG and eye movements using an eye-tracker."
-    
-	study_task_de =  "Es werden Ihnen verschiedene Bilder auf dem Monitor präsentiert. Ihre Aufgabe ist es, die Bilder frei zu erkunden."
-	study_task_en = "We will present different pictures on the screen. Your task is to freely explore these pictures."
-	
+	  study_purpose_de = """In dieser Studie untersuchen wir, wie das Gehirn visuelle Bewegung verarbeitet. Dazu messen wir Ihre Gehirnaktivität (EEG) und verfolgen Ihre Blickrichtung."""
+    study_purpose_en = """In this study, we investigate how the brain processes visual motion. We measure your brain activity (EEG) and track your gaze while you watch moving patterns."""
+
+    study_task_de = """Sie sehen bewegte Punktmuster, während Sie einen Punkt in der Mitte des Bildschirms fixieren. Nach jeder kurzen Präsentation geben Sie an, ob die Bewegung langsamer, gleich schnell oder schneller als die durchschnittliche Geschwindigkeit war."""
+    study_task_en = """You will watch moving dot patterns while keeping your eyes fixed on a central point. After each short presentation, you will indicate whether the motion was slower, the same, or faster than the average speed."""
+
 	researcher_details_de = """Verantwortliche Person: Benedikt Ehinger  
 								Computational Cognitive Science (CCS)  
 								Institut für Visualisierung und Interaktive Systeme (VIS)   
