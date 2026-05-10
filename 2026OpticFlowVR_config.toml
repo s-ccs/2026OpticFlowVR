@@ -10,7 +10,7 @@
     datasetDescription = "Neural Effects of Optic Flow in the Absence of Eye Movements: An EEG Study"
     license = "MIT License"
     subject = ["Medicine, Health and Life Sciences","Engineering"] # List of subjects related to the dataset required for dataverse metadata
-    pid = '' # Persistent identifier for the dataset, e.g. DOI or Handle. This will be updated automatically after creating the dataset in dataverse.
+    pid = "doi:10.18419/DARUS-5966" # Persistent identifier for the dataset, e.g. DOI or Handle. This will be updated automatically after creating the dataset in dataverse.
 
   [OtherFilesInfo]
     otherFilesUsed = true # Set to true if you want to include other (non-eeg-files) files (experiment files, other modalities like eye tracking) in the dataset, else false
