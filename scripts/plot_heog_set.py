@@ -18,7 +18,7 @@ raw.set_channel_types({
 
 raw.pick(["x", "HEOGR", "HEOGL", "VEOGU"])
 
-# Remove annotations/events for faster interactive viewing
+# Remove annotations for faster interactive viewing
 raw.set_annotations(None)
 
 raw.crop(tmax=60)

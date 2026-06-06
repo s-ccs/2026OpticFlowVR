@@ -14,7 +14,23 @@ DATA_ROOT = PROJECT_ROOT / "data"
 GROUP_OUT = PROJECT_ROOT / "output" / "group" / "psychometric_plots"
 GROUP_OUT.mkdir(parents=True, exist_ok=True)
 
-SUBJECTS = ["sub-001", "sub-002", "sub-003", "sub-004"]
+SUBJECTS = [
+    "sub-001", 
+    "sub-002", 
+    "sub-003", 
+    "sub-004",
+    "sub-005",
+    "sub-006",
+    "sub-007",
+    "sub-008",
+    "sub-009",
+    "sub-010",
+    "sub-011",
+    "sub-012",
+    "sub-013",
+    "sub-014",
+    "sub-015",
+]
 
 
 def parse_compare_event(event: str) -> dict:
@@ -143,16 +159,7 @@ if not all_rows:
     raise FileNotFoundError(f"No participant files found in: {DATA_ROOT}")
 
 data = pd.concat(all_rows, ignore_index=True)
-
-# Only the first half of trials per participant
 data = data.sort_values(["subject", "onset"]).reset_index(drop=True)
-
-data["trial_order_in_subject"] = data.groupby("subject").cumcount()
-data["n_trials_in_subject"] = data.groupby("subject")["trial_order_in_subject"].transform("count")
-
-data = data[
-    data["trial_order_in_subject"] < data["n_trials_in_subject"] / 2
-].copy()
 
 if data.empty:
     raise ValueError("After selecting the first half of trials, no trials remain.")
@@ -163,26 +170,16 @@ for subject, sub_df in data.groupby("subject"):
     subject_out = PROJECT_ROOT / "output" / subject
     subject_out.mkdir(parents=True, exist_ok=True)
 
-    # plot_psychometric(
-    #     sub_df,
-    #     title=f"Psychometric curve: {subject}",
-    #     out_path=subject_out / f"{subject}_psychometric_curve.png",
-    # )
     plot_psychometric(
         sub_df,
-        title=f"Psychometric curve, first half: {subject}",
-        out_path=subject_out / f"{subject}_psychometric_curve_first_half.png",
+        title=f"Psychometric curve: {subject}",
+        out_path=subject_out / f"{subject}_psychometric_curve.png",
     )
 
-# plot_psychometric(
-#     data,
-#     title="Group psychometric curve",
-#     out_path=GROUP_OUT / "group_psychometric_curve.png",
-# )
 plot_psychometric(
     data,
-    title="Group psychometric curve, first half",
-    out_path=GROUP_OUT / "group_psychometric_curve_first_half.png",
+    title="Group psychometric curve",
+    out_path=GROUP_OUT / "group_psychometric_curve.png",
 )
 
 print("Done.")
