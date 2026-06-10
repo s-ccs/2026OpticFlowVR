@@ -31,11 +31,11 @@ SUBJECTS = [
 
 CONDITIONS = [
     "Forward",
-    "Random",
     "Rotation/Left",
     "Rotation/Right",
     "Spiral/Left",
     "Spiral/Right",
+    "Random",
 ]
 
 CHANNEL_GROUPS = {
@@ -44,6 +44,14 @@ CHANNEL_GROUPS = {
     "posterior": ["O1", "O2", "POz", "PO3", "PO4", "PO7", "PO8"],
     "central": ["FCz", "Cz", "CP1", "CP2", "Pz"],
     "fcz": ["FCz"],
+}
+
+FONT_SIZES = {
+    "title": 24,
+    "subtitle": 20,
+    "axis_label": 20,
+    "tick_label": 18,
+    "legend": 18,
 }
 
 
@@ -69,15 +77,12 @@ def load_epochs(subject):
     epochs = mne.read_epochs(epochs_file, preload=True)
     epochs.apply_baseline((-0.2, 0.0))
 
-    # low-pass filter for plotting only
-    epochs_plot = epochs.copy().filter(l_freq=None, h_freq=30.0)
-
     print(f"Epochs have baseline: {epochs.baseline}")
-    print(epochs_plot)
+    print(epochs)
     print("Available event IDs:")
-    print(epochs_plot.event_id)
+    print(epochs.event_id)
 
-    return epochs_plot
+    return epochs
 
 
 def create_evokeds(epochs):
@@ -102,7 +107,7 @@ def plot_condition_subplots(subject, out_dir, evokeds, channels, group_name):
         print(f"Skipping {group_name}: no available channels")
         return
 
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 3, figsize=(20, 12), sharex=True, sharey=True)
     axes = axes.ravel()
 
     for ax, condition in zip(axes, CONDITIONS):
@@ -110,14 +115,15 @@ def plot_condition_subplots(subject, out_dir, evokeds, channels, group_name):
 
         data_uv = evoked.data.mean(axis=0) * 1e6
 
-        ax.plot(evoked.times, data_uv)
-        ax.axvline(0, linestyle="--", color="black", linewidth=1)
-        ax.axhline(0, color="black", linewidth=0.8)
-        ax.set_title(condition)
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("µV")
+        ax.plot(evoked.times, data_uv, linewidth=2)
+        ax.axvline(0, linestyle="--", color="black", linewidth=1.2,)
+        ax.axhline(0, color="black", linewidth=1.0,)
+        ax.set_title(condition, fontsize=FONT_SIZES["subtitle"],)
+        ax.set_xlabel("Time (s)", fontsize=FONT_SIZES["axis_label"],)
+        ax.set_ylabel("µV", fontsize=FONT_SIZES["axis_label"],)
+        ax.tick_params(axis="both", labelsize=FONT_SIZES["tick_label"],)
 
-    fig.suptitle(f"Sub-{subject} {group_name} ERP by condition", fontsize=16)
+    fig.suptitle(f"Sub-{subject} {group_name} ERP by condition", fontsize=FONT_SIZES["title"])
     fig.tight_layout()
 
     fig.savefig(
@@ -137,13 +143,18 @@ def plot_condition_erps(subject, out_dir, evokeds, epochs):
             print(f"Skipping {group_name}: no available channels")
             continue
 
+        title = f"Sub-{subject} {group_name} ERP"
+
         fig = mne.viz.plot_compare_evokeds(
             evokeds,
             picks=available_channels,
             combine="mean",
             show=False,
-            title=f"Sub-{subject} {group_name} ERP",
+            title=title,
         )
+        fig[0].set_size_inches(12, 8)
+
+        style_compare_evokeds_figure(fig, title)
 
         fig[0].savefig(
             out_dir / f"sub-{subject}_{group_name}_condition-erps.png",
@@ -184,6 +195,29 @@ def plot_topomaps(subject, out_dir, epochs):
     )
 
     plt.close(fig)
+
+
+def style_compare_evokeds_figure(fig, title):
+    ax = fig[0].axes[0]
+
+    ax.set_title(title, fontsize=FONT_SIZES["title"])
+    ax.set_xlabel("Time (s)", fontsize=FONT_SIZES["axis_label"])
+    ax.set_ylabel("µV", fontsize=FONT_SIZES["axis_label"])
+
+    ax.tick_params(
+        axis="both",
+        labelsize=FONT_SIZES["tick_label"],
+    )
+
+    legend = ax.get_legend()
+
+    if legend is not None:
+        legend.set_loc("upper center")
+        legend.set_bbox_to_anchor((0.5, -0.15))
+        legend.set_ncols(2)
+
+        for text in legend.get_texts():
+            text.set_fontsize(FONT_SIZES["legend"])
 
 
 def process_subject(subject):

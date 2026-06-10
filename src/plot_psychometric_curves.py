@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 DATA_ROOT = PROJECT_ROOT / "data"
 
-GROUP_OUT = PROJECT_ROOT / "output" / "group" / "psychometric_plots"
+GROUP_OUT = PROJECT_ROOT / "output" / "plots" / "group" / "psychometric_plots"
 GROUP_OUT.mkdir(parents=True, exist_ok=True)
 
 SUBJECTS = [
@@ -135,7 +135,7 @@ def plot_psychometric(plot_df, title, out_path):
 all_rows = []
 
 for subject in SUBJECTS:
-    file_path = DATA_ROOT / subject / "ses-001" / "beh" / f"{subject}_task-compareSpeed_events.csv"
+    file_path = DATA_ROOT / subject / "ses-001" / "misc" / f"{subject}_ses-001_task-compareSpeed_events.csv"
 
     if not file_path.exists():
         print(f"Missing file, skipping: {file_path}")
@@ -159,15 +159,49 @@ if not all_rows:
     raise FileNotFoundError(f"No participant files found in: {DATA_ROOT}")
 
 data = pd.concat(all_rows, ignore_index=True)
+
+print("=== Overall response counts ===")
+print(data["response"].value_counts())
+
+print("\n=== Reference speed value counts ===")
+print(data["refSpeedVal"].value_counts())
+
+print("\n=== Response counts by speed and condition ===")
+
+summary_cond = (
+    data.groupby(["cond", "currSpeedVal"])
+    .agg(
+        n_trials=("answered_faster", "size"),
+        p_faster=("answered_faster", "mean"),
+    )
+    .reset_index()
+    .sort_values(["cond", "currSpeedVal"])
+)
+
+print(summary_cond)
+
+slowest = data["currSpeedVal"].min()
+
+print(f"\n=== Slowest speed ({slowest}) ===")
+
+print(
+    data[data["currSpeedVal"] == slowest]
+    .groupby("cond")
+    .agg(
+        n_trials=("answered_faster", "size"),
+        p_faster=("answered_faster", "mean"),
+    )
+)
+
 data = data.sort_values(["subject", "onset"]).reset_index(drop=True)
 
 if data.empty:
-    raise ValueError("After selecting the first half of trials, no trials remain.")
+    raise ValueError("No trials remain.")
 
-data.to_csv(GROUP_OUT / "compare_speed_parsed_trials_first_half.csv", index=False)
+data.to_csv(GROUP_OUT / "compare_speed_parsed_trials.csv", index=False)
 
 for subject, sub_df in data.groupby("subject"):
-    subject_out = PROJECT_ROOT / "output" / subject
+    subject_out = PROJECT_ROOT / "output" / "plots" / subject
     subject_out.mkdir(parents=True, exist_ok=True)
 
     plot_psychometric(
@@ -184,4 +218,4 @@ plot_psychometric(
 
 print("Done.")
 print(f"Group outputs saved to: {GROUP_OUT}")
-print(f"Subject outputs saved to: {PROJECT_ROOT / 'output' / 'sub-XXX'}")
+print(f"Subject outputs saved to: {PROJECT_ROOT / 'output' / 'plots' / 'sub-XXX'}")

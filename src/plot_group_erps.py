@@ -33,11 +33,11 @@ SUBJECTS = [
 
 CONDITIONS = [
     "Forward",
-    "Random",
     "Rotation/Left",
     "Rotation/Right",
     "Spiral/Left",
     "Spiral/Right",
+    "Random",
 ]
 
 CHANNEL_GROUPS = {
@@ -46,6 +46,15 @@ CHANNEL_GROUPS = {
     "posterior": ["O1", "O2", "POz", "PO3", "PO4", "PO7", "PO8"],
     "central": ["FCz", "Cz", "CP1", "CP2", "Pz"],
     "fcz": ["FCz"],
+    "pz": ["Pz"],
+}
+
+FONT_SIZES = {
+    "title": 24,
+    "subtitle": 20,
+    "axis_label": 20,
+    "tick_label": 18,
+    "legend": 18,
 }
 
 
@@ -70,9 +79,6 @@ def load_subject_epochs(subject):
 
     epochs = mne.read_epochs(epochs_file, preload=True)
     epochs.apply_baseline((-0.2, 0.0))
-
-    # Visualization-only low-pass
-    epochs = epochs.copy().filter(l_freq=None, h_freq=30.0)
 
     print(epochs)
 
@@ -145,13 +151,17 @@ def plot_group_condition_erps(grand_averages, included_subjects):
             print(f"Skipping {group_name}: no available channels")
             continue
 
+        title = f"Group {group_name} ERP, N={len(included_subjects)}"
+
         fig = mne.viz.plot_compare_evokeds(
             grand_averages,
             picks=available_channels,
             combine="mean",
             show=False,
-            title=f"Group {group_name} ERP, N={len(included_subjects)}",
+            title=title,
         )
+
+        style_compare_evokeds_figure(fig, title)
 
         fig[0].savefig(
             OUT_DIR / f"group_{group_name}_condition-erps.png",
@@ -175,7 +185,7 @@ def plot_group_condition_subplots(grand_averages, included_subjects, group_name)
         print(f"Skipping {group_name}: no available channels")
         return
 
-    fig, axes = plt.subplots(2, 3, figsize=(15, 8), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10), sharex=True, sharey=True)
     axes = axes.ravel()
 
     for ax, condition in zip(axes, CONDITIONS):
@@ -187,16 +197,18 @@ def plot_group_condition_subplots(grand_averages, included_subjects, group_name)
         evoked = grand_averages[condition].copy().pick(available_channels)
         data_uv = evoked.data.mean(axis=0) * 1e6
 
-        ax.plot(evoked.times, data_uv)
-        ax.axvline(0, linestyle="--", color="black", linewidth=1)
-        ax.axhline(0, color="black", linewidth=0.8)
-        ax.set_title(condition)
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("µV")
+        ax.plot(evoked.times, data_uv, linewidth=2)
+        ax.axvline(0, linestyle="--", color="black", linewidth=1.2)
+        ax.axhline(0, color="black", linewidth=1.0)
+
+        ax.set_title(condition, fontsize=FONT_SIZES["subtitle"])
+        ax.set_xlabel("Time (s)", fontsize=FONT_SIZES["axis_label"])
+        ax.set_ylabel("µV", fontsize=FONT_SIZES["axis_label"])
+        ax.tick_params(axis="both", labelsize=FONT_SIZES["tick_label"])
 
     fig.suptitle(
         f"Group {group_name} ERP by condition, N={len(included_subjects)}",
-        fontsize=16,
+        fontsize=FONT_SIZES["title"],
     )
     fig.tight_layout()
 
@@ -229,6 +241,23 @@ def plot_group_topomaps(grand_averages, included_subjects):
     )
 
     plt.close(fig)
+
+
+def style_compare_evokeds_figure(fig, title):
+    ax = fig[0].axes[0]
+
+    ax.set_title(title, fontsize=FONT_SIZES["title"])
+    ax.set_xlabel("Time (s)", fontsize=FONT_SIZES["axis_label"])
+    ax.set_ylabel("µV", fontsize=FONT_SIZES["axis_label"])
+    ax.tick_params(axis="both", labelsize=FONT_SIZES["tick_label"])
+
+    legend = ax.get_legend()
+
+    if legend is not None:
+        legend.set_loc("lower right")
+
+        for text in legend.get_texts():
+            text.set_fontsize(FONT_SIZES["legend"])
 
 
 def save_group_evokeds(grand_averages, included_subjects):
