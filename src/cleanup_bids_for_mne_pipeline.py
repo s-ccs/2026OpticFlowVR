@@ -4,6 +4,7 @@ Creates a cleaned copy of data/ in data_clean/
 """
 
 from pathlib import Path
+from pyprep.find_noisy_channels import NoisyChannels
 import shutil
 import re
 import pandas as pd
@@ -91,6 +92,35 @@ def clean_raw(raw):
     return raw
 
 
+def detect_bad_channels_with_pyprep(raw, subject):
+    """Detect bad EEG channels using PyPREP"""
+
+    print(f"  Running PyPREP bad-channel detection for sub-{subject}")
+
+    raw_eeg = raw.copy().pick("eeg")
+
+    if len(raw_eeg.ch_names) == 0:
+        print("  No EEG channels found for PyPREP.")
+        return []
+
+    montage = mne.channels.make_standard_montage("standard_1020")
+    raw_eeg.set_montage(montage, on_missing="ignore")
+
+    noisy = NoisyChannels(
+        raw_eeg,
+        do_detrend=True,
+        random_state=42,
+    )
+
+    noisy.find_all_bads()
+
+    pyprep_bads = noisy.get_bads()
+
+    print(f"  PyPREP bad channels: {pyprep_bads}")
+
+    return pyprep_bads
+
+
 def copy_bids_sidecars():
     """Copy BIDS dataset, excluding pilot subjects"""
 
@@ -122,21 +152,29 @@ def clean_all_set_files():
         subject = set_file.name.split("_")[0].replace("sub-", "")
 
         raw = mne.io.read_raw_eeglab(set_file, preload=True)
-
-        manual_bads = BAD_CHANNELS.get(subject, [])
-
-        if manual_bads:
-            available_bads = [ch for ch in manual_bads if ch in raw.ch_names]
-            print(f"  Marking bad channels for sub-{subject}: {available_bads}")
-            raw.info["bads"] = available_bads
-
         raw = clean_raw(raw)
 
-        if raw.info["bads"]:
-            print(f"  Interpolating bad EEG channels: {raw.info['bads']}")
+        manual_bads = BAD_CHANNELS.get(subject, [])
+        manual_bads = [ch for ch in manual_bads if ch in raw.ch_names]
+
+        pyprep_bads = detect_bad_channels_with_pyprep(raw, subject)
+        pyprep_bads = [ch for ch in pyprep_bads if ch in raw.ch_names]
+
+        all_bads = sorted(set(manual_bads + pyprep_bads))
+
+        if all_bads:
+            print(f"  Manual bad channels: {manual_bads}")
+            print(f"  PyPREP bad channels: {pyprep_bads}")
+            print(f"  Final bad channels for interpolation: {all_bads}")
+
+            raw.info["bads"] = all_bads
+
             montage = mne.channels.make_standard_montage("standard_1020")
             raw.set_montage(montage, on_missing="ignore")
+
             raw.interpolate_bads(reset_bads=True)
+        else:
+            print("  No bad EEG channels marked.")
 
         raw.export(set_file, fmt="eeglab", overwrite=True)
         print(f"Saved cleaned file: {set_file}")

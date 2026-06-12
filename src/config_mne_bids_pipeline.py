@@ -31,19 +31,6 @@ sessions = ["001"]
 task = "compareSpeed"
 runs = ["1"]
 
-eeg_template_montage = "standard_1020"
-ch_types = ["eeg"]
-eeg_reference = "average"
-
-l_freq = 0.1
-h_freq = 100.0
-notch_freq = 50.0
-raw_resample_sfreq = 250
-plot_psd_for_runs = [] # disable PSD plotting
-
-spatial_filter = None
-# ica_reject = "autoreject_local"
-
 conditions = [
     "Forward",
     "Random",
@@ -53,6 +40,18 @@ conditions = [
     "Spiral/Right",
 ]
 
+eeg_template_montage = "standard_1020"
+ch_types = ["eeg"]
+eeg_reference = "average"
+
+l_freq = 0.1
+h_freq = 100.0
+notch_freq = 50.0
+raw_resample_sfreq = 250
+
+spatial_filter = "ica"
+ica_reject = {"eeg": 600e-6}
+reject = {"eeg": 300e-6}
+
 epochs_tmin = -0.2
 epochs_tmax = 0.8
-reject = {"eeg": 200e-6}
