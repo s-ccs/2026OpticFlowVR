@@ -10,7 +10,7 @@ SESSION = "001"
 TASK = "compareSpeed"
 
 DERIV_ROOT = PROJECT_ROOT / "output" / "derivatives" / "mne-bids-pipeline"
-PLOTS_ROOT = PROJECT_ROOT / "output" / "plots"
+PLOTS_ROOT = PROJECT_ROOT / "output" 
 
 SUBJECTS = [
     "002",
@@ -182,7 +182,7 @@ def plot_topomaps(subject, out_dir, epochs):
     evoked_all = epochs.average()
 
     fig = evoked_all.plot_topomap(
-        times=[0.10, 0.15, 0.20, 0.25, 0.30, 0.40],
+        times=[0.10, 0.13, 0.15, 0.18, 0.20, 0.40],
         ch_type="eeg",
         show=False,
         time_unit="s",

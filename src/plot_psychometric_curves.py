@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 DATA_ROOT = PROJECT_ROOT / "data"
 
-GROUP_OUT = PROJECT_ROOT / "output" / "plots" / "group" / "psychometric_plots"
+GROUP_OUT = PROJECT_ROOT / "output" / "group" / "psychometric_plots"
 GROUP_OUT.mkdir(parents=True, exist_ok=True)
 
 SUBJECTS = [

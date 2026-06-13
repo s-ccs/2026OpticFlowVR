@@ -34,8 +34,10 @@ DROP_KEYWORDS = [
     "Confidence",
 ]
 
+VISUAL_ONSET_OFFSET_S = 0.030  # Unity/LSL marker to photodiode onset
+EEG_SFREQ = 1000
 
-def interpolate_nans(raw):
+def interpolate_nans(raw, log_file=None):
     data = raw.get_data()
 
     for ch_idx, ch_name in enumerate(raw.ch_names):
@@ -43,11 +45,11 @@ def interpolate_nans(raw):
         bad = ~np.isfinite(channel)
 
         if bad.all():
-            print(f"  Warning: {ch_name} is all NaN/Inf; filling with zeros.")
+            log(f"  Warning: {ch_name} is all NaN/Inf; filling with zeros.", log_file)
             channel[:] = 0.0
 
         elif bad.any():
-            print(f"  Interpolating {bad.sum()} NaN/Inf samples in {ch_name}")
+            log(f"  Interpolating {bad.sum()} NaN/Inf samples in {ch_name}", log_file)
             good_idx = np.where(~bad)[0]
             bad_idx = np.where(bad)[0]
             channel[bad_idx] = np.interp(bad_idx, good_idx, channel[good_idx])
@@ -58,7 +60,7 @@ def interpolate_nans(raw):
     return raw
 
 
-def clean_raw(raw):
+def clean_raw(raw, log_file=None):
     channels_to_drop = []
 
     for ch in raw.ch_names:
@@ -74,33 +76,33 @@ def clean_raw(raw):
     channels_to_drop = sorted(set(channels_to_drop))
 
     if channels_to_drop:
-        print(f"  Dropping channels: {channels_to_drop}")
+        log(f"  Dropping channels: {channels_to_drop}", log_file)
         raw.drop_channels(channels_to_drop)
 
     available_eog = [ch for ch in EOG_CHANNELS if ch in raw.ch_names]
 
     if available_eog:
-        print(f"  Marking EOG channels: {available_eog}")
+        log(f"  Marking EOG channels: {available_eog}", log_file)
         raw.set_channel_types({ch: "eog" for ch in available_eog})
 
-    raw = interpolate_nans(raw)
+    raw = interpolate_nans(raw, log_file)
 
-    print(f"  Final channels: {raw.info['nchan']}")
-    print(f"  EEG channels: {len(raw.copy().pick('eeg').ch_names)}")
-    print(f"  EOG channels: {len(raw.copy().pick('eog').ch_names)}")
+    log(f"  Final channels: {raw.info['nchan']}", log_file)
+    log(f"  EEG channels: {len(raw.copy().pick('eeg').ch_names)}", log_file)
+    log(f"  EOG channels: {len(raw.copy().pick('eog').ch_names)}", log_file)
 
     return raw
 
 
-def detect_bad_channels_with_pyprep(raw, subject):
+def detect_bad_channels_with_pyprep(raw, subject, log_file=None):
     """Detect bad EEG channels using PyPREP"""
 
-    print(f"  Running PyPREP bad-channel detection for sub-{subject}")
+    log(f"  Running PyPREP bad-channel detection for sub-{subject}", log_file)
 
     raw_eeg = raw.copy().pick("eeg")
 
     if len(raw_eeg.ch_names) == 0:
-        print("  No EEG channels found for PyPREP.")
+        log("  No EEG channels found for PyPREP.", log_file)
         return []
 
     montage = mne.channels.make_standard_montage("standard_1020")
@@ -116,19 +118,19 @@ def detect_bad_channels_with_pyprep(raw, subject):
 
     pyprep_bads = noisy.get_bads()
 
-    print(f"  PyPREP bad channels: {pyprep_bads}")
+    log(f"  PyPREP bad channels: {pyprep_bads}", log_file)
 
     return pyprep_bads
 
 
-def copy_bids_sidecars():
+def create_clean_dataset_copy(log_file=None):
     """Copy BIDS dataset, excluding pilot subjects"""
 
     if CLEAN_ROOT.exists():
-        print(f"Removing existing clean dataset: {CLEAN_ROOT}")
+        log(f"Removing existing clean dataset: {CLEAN_ROOT}", log_file)
         shutil.rmtree(CLEAN_ROOT)
 
-    print(f"Copying BIDS dataset:\n  {BIDS_ROOT}\n→ {CLEAN_ROOT}")
+    log(f"Copying BIDS dataset:\n  {BIDS_ROOT}\n→ {CLEAN_ROOT}", log_file)
 
     shutil.copytree(
         BIDS_ROOT,
@@ -146,26 +148,32 @@ def clean_all_set_files():
     print(f"Found {len(set_files)} EEGLAB .set files")
 
     for set_file in set_files:
-        print("\n" + "=" * 80)
-        print(f"Cleaning: {set_file.relative_to(CLEAN_ROOT)}")
-
         subject = set_file.name.split("_")[0].replace("sub-", "")
 
+        output_dir = PROJECT_ROOT / "output" / f"sub-{subject}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        log_file = output_dir / "clean_bids.log"
+        log_file.write_text("", encoding="utf-8")
+
+        log("\n" + "=" * 80, log_file)
+        log(f"Cleaning: {set_file.relative_to(CLEAN_ROOT)}", log_file)
+
         raw = mne.io.read_raw_eeglab(set_file, preload=True)
-        raw = clean_raw(raw)
+        raw = clean_raw(raw, log_file)
 
         manual_bads = BAD_CHANNELS.get(subject, [])
         manual_bads = [ch for ch in manual_bads if ch in raw.ch_names]
 
-        pyprep_bads = detect_bad_channels_with_pyprep(raw, subject)
+        pyprep_bads = detect_bad_channels_with_pyprep(raw, subject, log_file)
         pyprep_bads = [ch for ch in pyprep_bads if ch in raw.ch_names]
 
         all_bads = sorted(set(manual_bads + pyprep_bads))
 
         if all_bads:
-            print(f"  Manual bad channels: {manual_bads}")
-            print(f"  PyPREP bad channels: {pyprep_bads}")
-            print(f"  Final bad channels for interpolation: {all_bads}")
+            log(f"  Manual bad channels: {manual_bads}", log_file)
+            log(f"  PyPREP bad channels: {pyprep_bads}", log_file)
+            log(f"  Final bad channels for interpolation: {all_bads}", log_file)
 
             raw.info["bads"] = all_bads
 
@@ -174,10 +182,10 @@ def clean_all_set_files():
 
             raw.interpolate_bads(reset_bads=True)
         else:
-            print("  No bad EEG channels marked.")
+            log("  No bad EEG channels marked.", log_file)
 
         raw.export(set_file, fmt="eeglab", overwrite=True)
-        print(f"Saved cleaned file: {set_file}")
+        log(f"Saved cleaned file: {set_file}", log_file)
 
 
 def parse_trial_info(event_text):
@@ -211,7 +219,10 @@ def strip_marker_prefix(text):
 
 
 def clean_events_file(events_file):
-    print(f"\nCleaning events file: {events_file.relative_to(CLEAN_ROOT)}")
+    subject = events_file.name.split("_")[0].replace("sub-", "")
+    log_file = PROJECT_ROOT / "output" / f"sub-{subject}" / "clean_bids.log"
+
+    log(f"\nCleaning events file: {events_file.relative_to(CLEAN_ROOT)}", log_file)
 
     events = pd.read_csv(events_file, sep="\t")
 
@@ -230,8 +241,7 @@ def clean_events_file(events_file):
             last_cond, last_direction, last_speed_idx = parse_trial_info(event_text)
             continue
 
-        # Prefer photo_ON over stimOnset
-        if event_text == "photo_ON":
+        if event_text == "stimOnset":
             if last_cond is None:
                 continue
 
@@ -243,34 +253,18 @@ def clean_events_file(events_file):
             clean_rows.append(clean_row)
 
     if not clean_rows:
-        print("  Warning: no photo_ON events found. Falling back to stimOnset.")
-
-        last_cond = None
-        last_direction = None
-        last_speed_idx = None
-
-        for _, row in events.iterrows():
-            event_text = strip_marker_prefix(row[marker_col])
-
-            if event_text.startswith("TRIAL_INFO"):
-                last_cond, last_direction, last_speed_idx = parse_trial_info(event_text)
-                continue
-
-            if event_text == "stimOnset":
-                if last_cond is None:
-                    continue
-
-                clean_row = row.copy()
-                clean_row["trial_type"] = make_clean_trial_type(last_cond, last_direction)
-                clean_row["condition"] = last_cond
-                clean_row["direction"] = last_direction if last_direction else "n/a"
-                clean_row["speed_idx"] = last_speed_idx
-                clean_rows.append(clean_row)
-
-    if not clean_rows:
         raise RuntimeError(f"No clean stimulus-onset events found in {events_file}")
 
     clean_events = pd.DataFrame(clean_rows)
+
+    # Correct Unity/LSL visual onset markers to estimated physical screen onset
+    # Based on photodiode timing test: physical onset occurs ~30 ms after marker
+    clean_events["onset"] = clean_events["onset"].astype(float) + VISUAL_ONSET_OFFSET_S
+
+    if "sample" in clean_events.columns:
+        clean_events["sample"] = (
+            clean_events["sample"].astype(float) + VISUAL_ONSET_OFFSET_S * EEG_SFREQ
+        ).round().astype(int)
 
     keep_cols = [
         "onset",
@@ -289,7 +283,7 @@ def clean_events_file(events_file):
 
     check = pd.read_csv(events_file, sep="\t")
     bad_mask = check["trial_type"].astype(str).str.contains(
-        "TRIAL_INFO|OPTIC_FLOW|COMPARE|TRIAL_START|TRIAL_END|PREVIEW|photo_OFF|stimOffset|BAD_NAN",
+        "TRIAL_INFO|OPTIC_FLOW|COMPARE|TRIAL_START|TRIAL_END|PREVIEW|photo_ON|photo_OFF|stimOffset|BAD_NAN",
         regex=True,
     )
 
@@ -300,8 +294,8 @@ def clean_events_file(events_file):
             f"Still found verbose rows: {bad_examples}"
         )
 
-    print(f"  Kept {len(clean_events)} clean stimulus-onset events")
-    print(clean_events["trial_type"].value_counts().sort_index())
+    log(f"  Kept {len(clean_events)} clean stimulus-onset events", log_file)
+    log(clean_events["trial_type"].value_counts().sort_index().to_string(), log_file)
 
 
 def clean_all_events_files():
@@ -317,8 +311,16 @@ def clean_all_events_files():
         clean_events_file(events_file)
 
 
+def log(msg, log_file=None):
+    print(msg)
+
+    if log_file is not None:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+
+
 def main():
-    copy_bids_sidecars()
+    create_clean_dataset_copy()
     clean_all_set_files()
     clean_all_events_files()
 
