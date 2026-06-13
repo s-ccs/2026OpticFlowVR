@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import mne
@@ -243,7 +244,16 @@ def process_subject(subject):
 
 
 def main():
-    for subject in SUBJECTS:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sub", type=str, default=None)
+    args = parser.parse_args()
+
+    if args.sub is not None:
+        subjects = [args.sub.replace("sub-", "").zfill(3)]
+    else:
+        subjects = SUBJECTS
+
+    for subject in subjects:
         process_subject(subject)
 
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -31,6 +32,14 @@ SUBJECTS = [
     "sub-014",
     "sub-015",
 ]
+
+
+def normalize_subject(subject):
+    if subject is None:
+        return None
+
+    subject = str(subject).replace("sub-", "")
+    return f"sub-{subject.zfill(3)}"
 
 
 def parse_compare_event(event: str) -> dict:
@@ -132,17 +141,23 @@ def plot_psychometric(plot_df, title, out_path):
     plt.close()
 
 
-all_rows = []
-
-for subject in SUBJECTS:
-    file_path = DATA_ROOT / subject / "ses-001" / "misc" / f"{subject}_ses-001_task-compareSpeed_events.csv"
+def load_subject_data(subject):
+    file_path = (
+        DATA_ROOT
+        / subject
+        / "ses-001"
+        / "misc"
+        / f"{subject}_ses-001_task-compareSpeed_events.csv"
+    )
 
     if not file_path.exists():
         print(f"Missing file, skipping: {file_path}")
-        continue
+        return None
 
     df = pd.read_csv(file_path)
-    df = df[df["event"].astype(str).str.startswith("COMPARE_TO_MEAN_RESULT")].copy()
+    df = df[
+        df["event"].astype(str).str.startswith("COMPARE_TO_MEAN_RESULT")
+    ].copy()
 
     parsed = df["event"].apply(parse_compare_event)
     parsed_df = pd.DataFrame(parsed.tolist())
@@ -153,69 +168,114 @@ for subject in SUBJECTS:
     df["subject"] = subject
     df["answered_faster"] = (df["response"] == "FASTER").astype(int)
 
-    all_rows.append(df)
+    return df
 
-if not all_rows:
-    raise FileNotFoundError(f"No participant files found in: {DATA_ROOT}")
 
-data = pd.concat(all_rows, ignore_index=True)
+def main():
+    parser = argparse.ArgumentParser()
 
-print("=== Overall response counts ===")
-print(data["response"].value_counts())
-
-print("\n=== Reference speed value counts ===")
-print(data["refSpeedVal"].value_counts())
-
-print("\n=== Response counts by speed and condition ===")
-
-summary_cond = (
-    data.groupby(["cond", "currSpeedVal"])
-    .agg(
-        n_trials=("answered_faster", "size"),
-        p_faster=("answered_faster", "mean"),
-    )
-    .reset_index()
-    .sort_values(["cond", "currSpeedVal"])
-)
-
-print(summary_cond)
-
-slowest = data["currSpeedVal"].min()
-
-print(f"\n=== Slowest speed ({slowest}) ===")
-
-print(
-    data[data["currSpeedVal"] == slowest]
-    .groupby("cond")
-    .agg(
-        n_trials=("answered_faster", "size"),
-        p_faster=("answered_faster", "mean"),
-    )
-)
-
-data = data.sort_values(["subject", "onset"]).reset_index(drop=True)
-
-if data.empty:
-    raise ValueError("No trials remain.")
-
-data.to_csv(GROUP_OUT / "compare_speed_parsed_trials.csv", index=False)
-
-for subject, sub_df in data.groupby("subject"):
-    subject_out = PROJECT_ROOT / "output" / "plots" / subject
-    subject_out.mkdir(parents=True, exist_ok=True)
-
-    plot_psychometric(
-        sub_df,
-        title=f"Psychometric curve: {subject}",
-        out_path=subject_out / f"{subject}_psychometric_curve.png",
+    parser.add_argument(
+        "--sub",
+        type=str,
+        default=None,
+        help="Subject to process, e.g. 15, 015, or sub-015",
     )
 
-plot_psychometric(
-    data,
-    title="Group psychometric curve",
-    out_path=GROUP_OUT / "group_psychometric_curve.png",
-)
+    args = parser.parse_args()
+    subject = normalize_subject(args.sub)
 
-print("Done.")
-print(f"Group outputs saved to: {GROUP_OUT}")
-print(f"Subject outputs saved to: {PROJECT_ROOT / 'output' / 'plots' / 'sub-XXX'}")
+    if subject is None:
+        subjects = SUBJECTS
+    else:
+        subjects = [subject]
+
+    all_rows = []
+
+    for subject in subjects:
+        df = load_subject_data(subject)
+
+        if df is not None:
+            all_rows.append(df)
+
+    if not all_rows:
+        raise FileNotFoundError(f"No participant files found in: {DATA_ROOT}")
+
+    data = pd.concat(all_rows, ignore_index=True)
+
+    print("=== Overall response counts ===")
+    print(data["response"].value_counts())
+
+    print("\n=== Reference speed value counts ===")
+    print(data["refSpeedVal"].value_counts())
+
+    print("\n=== Response counts by speed and condition ===")
+
+    summary_cond = (
+        data.groupby(["cond", "currSpeedVal"])
+        .agg(
+            n_trials=("answered_faster", "size"),
+            p_faster=("answered_faster", "mean"),
+        )
+        .reset_index()
+        .sort_values(["cond", "currSpeedVal"])
+    )
+
+    print(summary_cond)
+
+    slowest = data["currSpeedVal"].min()
+
+    print(f"\n=== Slowest speed ({slowest}) ===")
+
+    print(
+        data[data["currSpeedVal"] == slowest]
+        .groupby("cond")
+        .agg(
+            n_trials=("answered_faster", "size"),
+            p_faster=("answered_faster", "mean"),
+        )
+    )
+
+    data = data.sort_values(["subject", "onset"]).reset_index(drop=True)
+
+    if data.empty:
+        raise ValueError("No trials remain.")
+
+    if subject is None:
+        parsed_out = GROUP_OUT / "compare_speed_parsed_trials.csv"
+    else:
+        parsed_out = (
+            PROJECT_ROOT
+            / "output"
+            / subject
+            / f"{subject}_compare_speed_parsed_trials.csv"
+        )
+        parsed_out.parent.mkdir(parents=True, exist_ok=True)
+
+    data.to_csv(parsed_out, index=False)
+    print(f"\nSaved parsed trials to: {parsed_out}")
+
+    for subject_name, sub_df in data.groupby("subject"):
+        subject_out = PROJECT_ROOT / "output" / subject_name
+        subject_out.mkdir(parents=True, exist_ok=True)
+
+        plot_psychometric(
+            sub_df,
+            title=f"Psychometric curve: {subject_name}",
+            out_path=subject_out / f"{subject_name}_psychometric_curve.png",
+        )
+
+    if subject is None:
+        plot_psychometric(
+            data,
+            title="Group psychometric curve",
+            out_path=GROUP_OUT / "group_psychometric_curve.png",
+        )
+
+        print(f"Group outputs saved to: {GROUP_OUT}")
+
+    print("Done.")
+    print(f"Subject outputs saved to: {PROJECT_ROOT / 'output' / 'sub-XXX'}")
+
+
+if __name__ == "__main__":
+    main()

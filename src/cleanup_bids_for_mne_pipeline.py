@@ -3,6 +3,7 @@ Clean BIDS EEGLAB .set files before running MNE-BIDS-Pipeline
 Creates a cleaned copy of data/ in data_clean/
 """
 
+import argparse
 from pathlib import Path
 from pyprep.find_noisy_channels import NoisyChannels
 import shutil
@@ -36,6 +37,15 @@ DROP_KEYWORDS = [
 
 VISUAL_ONSET_OFFSET_S = 0.030  # Unity/LSL marker to photodiode onset
 EEG_SFREQ = 1000
+
+
+def normalize_subject(subject):
+    if subject is None:
+        return None
+
+    subject = str(subject).replace("sub-", "")
+    return subject.zfill(3)
+
 
 def interpolate_nans(raw, log_file=None):
     data = raw.get_data()
@@ -123,24 +133,66 @@ def detect_bad_channels_with_pyprep(raw, subject, log_file=None):
     return pyprep_bads
 
 
-def create_clean_dataset_copy(log_file=None):
+def create_clean_dataset_copy(subject=None, log_file=None):
     """Copy BIDS dataset, excluding pilot subjects"""
 
-    if CLEAN_ROOT.exists():
-        log(f"Removing existing clean dataset: {CLEAN_ROOT}", log_file)
-        shutil.rmtree(CLEAN_ROOT)
+    # --------------------------------------------------
+    # Full dataset
+    # --------------------------------------------------
+    if subject is None:
+        if CLEAN_ROOT.exists():
+            log(f"Removing existing clean dataset: {CLEAN_ROOT}", log_file)
+            shutil.rmtree(CLEAN_ROOT)
 
-    log(f"Copying BIDS dataset:\n  {BIDS_ROOT}\n→ {CLEAN_ROOT}", log_file)
+        log(
+            f"Copying full BIDS dataset:\n"
+            f"  {BIDS_ROOT}\n"
+            f"-> {CLEAN_ROOT}",
+            log_file,
+        )
 
-    shutil.copytree(
-        BIDS_ROOT,
-        CLEAN_ROOT,
-        ignore=shutil.ignore_patterns("sub-001"),
+        shutil.copytree(
+            BIDS_ROOT,
+            CLEAN_ROOT,
+            ignore=shutil.ignore_patterns("sub-001"),
+        )
+
+        return
+
+    # --------------------------------------------------
+    # Single subject
+    # --------------------------------------------------
+    src_subject = BIDS_ROOT / f"sub-{subject}"
+    dst_subject = CLEAN_ROOT / f"sub-{subject}"
+
+    if not src_subject.exists():
+        raise FileNotFoundError(
+            f"Subject not found: {src_subject}"
+        )
+
+    CLEAN_ROOT.mkdir(parents=True, exist_ok=True)
+
+    if dst_subject.exists():
+        log(
+            f"Removing existing clean copy: {dst_subject}",
+            log_file,
+        )
+        shutil.rmtree(dst_subject)
+
+    log(
+        f"Copying subject:\n"
+        f"  {src_subject}\n"
+        f"-> {dst_subject}",
+        log_file,
     )
 
+    shutil.copytree(src_subject, dst_subject)
 
-def clean_all_set_files():
-    set_files = sorted(CLEAN_ROOT.glob("sub-*/ses-*/eeg/*_eeg.set"))
+def clean_all_set_files(subject=None):
+    if subject is None:
+        set_files = sorted(CLEAN_ROOT.glob("sub-*/ses-*/eeg/*_eeg.set"))
+    else:
+        set_files = sorted(CLEAN_ROOT.glob(f"sub-{subject}/ses-*/eeg/*_eeg.set"))
 
     if not set_files:
         raise RuntimeError(f"No .set files found in {CLEAN_ROOT}")
@@ -214,7 +266,7 @@ def make_clean_trial_type(cond, direction):
 def strip_marker_prefix(text):
     text = str(text)
     text = text.split("|")[0]
-    text = re.sub(r"^\d+-", "", text)
+    text = re.sub(r"^\d+-", "", str(text))
     return text
 
 
@@ -298,8 +350,11 @@ def clean_events_file(events_file):
     log(clean_events["trial_type"].value_counts().sort_index().to_string(), log_file)
 
 
-def clean_all_events_files():
-    events_files = sorted(CLEAN_ROOT.glob("sub-*/ses-*/eeg/*_events.tsv"))
+def clean_all_events_files(subject=None):
+    if subject is None:
+        events_files = sorted(CLEAN_ROOT.glob("sub-*/ses-*/eeg/*_events.tsv"))
+    else:
+        events_files = sorted(CLEAN_ROOT.glob(f"sub-{subject}/ses-*/eeg/*_events.tsv"))
 
     if not events_files:
         print("No events.tsv files found.")
@@ -320,11 +375,28 @@ def log(msg, log_file=None):
 
 
 def main():
-    create_clean_dataset_copy()
-    clean_all_set_files()
-    clean_all_events_files()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--sub",
+        type=str,
+        default=None,
+        help="Subject to process, e.g. 15 or 015",
+    )
+
+    args = parser.parse_args()
+    subject = normalize_subject(args.sub)
+
+    create_clean_dataset_copy(subject)
+    clean_all_set_files(subject)
+    clean_all_events_files(subject)
 
     print("\nDone.")
+
+    if subject:
+        print(f"Processed sub-{subject}")
+    else:
+        print(f"Processed all subjects")
+
     print(f"Cleaned BIDS dataset written to: {CLEAN_ROOT}")
 
 
