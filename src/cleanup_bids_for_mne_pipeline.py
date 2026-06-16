@@ -298,7 +298,7 @@ def clean_events_file(events_file):
                 continue
 
             clean_row = row.copy()
-            clean_row["trial_type"] = make_clean_trial_type(last_cond, last_direction)
+            clean_row["trial_type"] = (f"{make_clean_trial_type(last_cond, last_direction)}/speed-{last_speed_idx}")
             clean_row["condition"] = last_cond
             clean_row["direction"] = last_direction if last_direction else "n/a"
             clean_row["speed_idx"] = last_speed_idx

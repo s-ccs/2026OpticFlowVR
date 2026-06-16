@@ -31,13 +31,19 @@ sessions = ["001"]
 task = "compareSpeed"
 runs = ["1"]
 
-conditions = [
+base_conditions = [
     "Forward",
     "Random",
     "Rotation/Left",
     "Rotation/Right",
     "Spiral/Left",
     "Spiral/Right",
+]
+
+conditions = [
+    f"{condition}/speed-{speed_idx}"
+    for condition in base_conditions
+    for speed_idx in range(7)
 ]
 
 eeg_template_montage = "standard_1020"

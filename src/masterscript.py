@@ -41,55 +41,52 @@ def main():
     subject = normalize_subject(args.sub)
 
     # 1. Clean BIDS dataset
-    if not args.skip_clean:
-        clean_cmd = [
-            sys.executable,
-            str(SRC / "cleanup_bids_for_mne_pipeline.py"),
-        ]
+    clean_cmd = [
+        sys.executable,
+        str(SRC / "cleanup_bids_for_mne_pipeline.py"),
+    ]
 
-        if subject is not None:
-            clean_cmd += ["--sub", subject]
+    if subject is not None:
+        clean_cmd += ["--sub", subject]
 
-        run_command(clean_cmd, "Step 1: Cleaning BIDS dataset")
+    run_command(clean_cmd, "Step 1: Cleaning BIDS dataset")
 
     # 2. Run MNE-BIDS-Pipeline
-    if not args.skip_mne:
-        mne_cmd = [
-            "mne_bids_pipeline",
-            f"--config={SRC / 'config_mne_bids_pipeline.py'}",
-            "--steps=preprocessing",
-        ]
+    mne_cmd = [
+        "mne_bids_pipeline",
+        f"--config={SRC / 'config_mne_bids_pipeline.py'}",
+        "--steps=preprocessing",
+    ]
 
-        if subject is not None:
-            mne_cmd += ["--subject", subject]
+    if subject is not None:
+        mne_cmd += ["--subject", subject]
 
-        run_command(mne_cmd, "Step 2: Running MNE-BIDS-Pipeline")
+    run_command(mne_cmd, "Step 2: Running MNE-BIDS-Pipeline")
 
     # 3. Plot ERPs and psychometric curves
-    if not args.skip_plots:
-        condition_cmd = [
-            sys.executable,
-            str(SRC / "plot_condition_erps.py"),
-        ]
+    condition_cmd = [
+        sys.executable,
+        str(SRC / "plot_condition_erps.py"),
+    ]
 
-        group_cmd = [
-            sys.executable,
-            str(SRC / "plot_group_erps.py"),
-        ]
+    group_cmd = [
+        sys.executable,
+        str(SRC / "plot_group_erps.py"),
+    ]
 
-        psychometric_cmd = [
-            sys.executable,
-            str(SRC / "plot_psychometric_curves.py"),
-        ]
+    psychometric_cmd = [
+        sys.executable,
+        str(SRC / "plot_psychometric_curves.py"),
+    ]
 
-        if subject is not None:
-            condition_cmd += ["--sub", subject]
-            group_cmd += ["--sub", subject]
-            psychometric_cmd += ["--sub", subject]
+    if subject is not None:
+        condition_cmd += ["--sub", subject]
+        group_cmd += ["--sub", subject]
+        psychometric_cmd += ["--sub", subject]
 
-        run_command(condition_cmd, "Step 3: Plotting subject condition ERPs")
-        run_command(group_cmd, "Step 4: Plotting group ERPs")
-        run_command(psychometric_cmd, "Step 5: Plotting psychometric curves")
+    run_command(condition_cmd, "Step 3: Plotting subject condition ERPs")
+    run_command(group_cmd, "Step 4: Plotting group ERPs")
+    run_command(psychometric_cmd, "Step 5: Plotting psychometric curves")
 
     print("\nDone.")
 
