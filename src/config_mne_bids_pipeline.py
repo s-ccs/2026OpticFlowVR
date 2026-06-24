@@ -26,6 +26,14 @@ subjects = [
     "013",
     "014",
     "015",
+    "016",
+    # "017",  # could not be converted to BIDS
+    "018",
+    "019",
+    "020",
+    "021",
+    "022",
+    "023",
 ]
 sessions = ["001"]
 task = "compareSpeed"

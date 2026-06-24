@@ -31,6 +31,14 @@ SUBJECTS = [
     "sub-013",
     "sub-014",
     "sub-015",
+    "sub-016",
+    "sub-017",
+    "sub-018",
+    "sub-019",
+    "sub-020",
+    "sub-021",
+    "sub-022",
+    "sub-023",
 ]
 
 
@@ -191,8 +199,8 @@ def main():
 
     all_rows = []
 
-    for subject in subjects:
-        df = load_subject_data(subject)
+    for subject_name in subjects:
+        df = load_subject_data(subject_name)
 
         if df is not None:
             all_rows.append(df)

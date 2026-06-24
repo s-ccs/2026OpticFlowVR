@@ -29,6 +29,14 @@ SUBJECTS = [
     "013",
     "014",
     "015",
+    "016",
+    # "017",
+    "018",
+    "019",
+    "020",
+    "021",
+    "022",
+    "023",
 ]
 
 CONDITIONS = [
@@ -344,7 +352,7 @@ def plot_topomaps(subject, out_dir, epochs):
     evoked_all = epochs.average()
 
     fig = evoked_all.plot_topomap(
-        times=[0.10, 0.13, 0.15, 0.18, 0.20, 0.40],
+        times=[0.10, 0.13, 0.15, 0.18, 0.20, 0.30, 0.40],
         ch_type="eeg",
         show=False,
         time_unit="s",
