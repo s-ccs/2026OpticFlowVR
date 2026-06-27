@@ -82,13 +82,28 @@ FONT_SIZES = {
 
 
 def get_epochs_file(subject):
-    return (
+    eeg_dir = (
         DERIV_ROOT
         / f"sub-{subject}"
         / f"ses-{SESSION}"
         / "eeg"
+    )
+
+    fixation_file = (
+        eeg_dir
+        / f"sub-{subject}_ses-{SESSION}_task-{TASK}_proc-clean_fixation-epo.fif"
+    )
+
+    clean_file = (
+        eeg_dir
         / f"sub-{subject}_ses-{SESSION}_task-{TASK}_proc-clean_epo.fif"
     )
+
+    if fixation_file.exists():
+        print(f"Using fixation-cleaned epochs for sub-{subject}")
+        return fixation_file
+
+    return clean_file
 
 
 def load_epochs(subject):

@@ -63,7 +63,18 @@ def main():
 
     run_command(mne_cmd, "Step 2: Running MNE-BIDS-Pipeline")
 
-    # 3. Plot ERPs and psychometric curves
+    # 3. Reject trials with poor fixation
+    fixation_cmd = [
+        sys.executable,
+        str(SRC / "fixation_check.py"),
+    ]
+
+    if subject is not None:
+        fixation_cmd += ["--sub", subject]
+
+    run_command(fixation_cmd, "Step 3: Running fixation check")
+
+    # 4. Plot ERPs and psychometric curves
     condition_cmd = [
         sys.executable,
         str(SRC / "plot_condition_erps.py"),
@@ -84,9 +95,9 @@ def main():
         group_cmd += ["--sub", subject]
         psychometric_cmd += ["--sub", subject]
 
-    run_command(condition_cmd, "Step 3: Plotting subject condition ERPs")
-    run_command(group_cmd, "Step 4: Plotting group ERPs")
-    run_command(psychometric_cmd, "Step 5: Plotting psychometric curves")
+    run_command(condition_cmd, "Step 4: Plotting subject condition ERPs")
+    run_command(group_cmd, "Step 5: Plotting group ERPs")
+    run_command(psychometric_cmd, "Step 6: Plotting psychometric curves")
 
     print("\nDone.")
 
