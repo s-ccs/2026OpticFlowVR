@@ -18,7 +18,7 @@ DERIV_ROOT = (
     / "mne-bids-pipeline"
 )
 
-OUT_ROOT = PROJECT_ROOT / "output"
+OUT_ROOT = PROJECT_ROOT / "output" / "fixation"
 
 SESSION = "001"
 TASK = "compareSpeed"
@@ -30,7 +30,12 @@ STIM_END_S = 0.8
 BASELINE_START_S = -0.2
 BASELINE_END_S = 0.0
 
-DEFAULT_THRESHOLD = 150
+SCENE_WIDTH_PX = 1600
+SCENE_HEIGHT_PX = 1200
+SCENE_HFOV_DEG = 103
+SCENE_VFOV_DEG = 77
+
+DEFAULT_THRESHOLD_DEG = 10.0
 DEFAULT_MIN_PROP_INSIDE = 0.80
 DEFAULT_MAX_PROP_MISSING = 0.30
 
@@ -73,7 +78,6 @@ def guess_gaze_channels(raw, x_name=None, y_name=None):
             raise ValueError(f"Requested y channel not found: {y_name}")
         return x_name, y_name
 
-    # Most likely case in your cleanup script: channels literally called x and y.
     exact_pairs = [
         ("x", "y"),
         ("gaze_x", "gaze_y"),
@@ -86,7 +90,7 @@ def guess_gaze_channels(raw, x_name=None, y_name=None):
         if x_lower in lower_to_original and y_lower in lower_to_original:
             return lower_to_original[x_lower], lower_to_original[y_lower]
 
-    # Fallback: look for channels containing gaze + x/y.
+    # Fallback: look for channels containing gaze + x/y
     x_candidates = [
         ch for ch in ch_names
         if "gaze" in ch.lower() and (
@@ -108,11 +112,7 @@ def guess_gaze_channels(raw, x_name=None, y_name=None):
         return x_candidates[0], y_candidates[0]
 
     raise RuntimeError(
-        "Could not automatically identify gaze x/y channels.\n"
-        "Run this to inspect channel names:\n"
-        "    python src/fixation_check.py --sub XXX --list-channels\n"
-        "Then pass them explicitly, e.g.:\n"
-        "    python src/fixation_check.py --sub XXX --x-channel x --y-channel y"
+        "Could not automatically identify gaze x/y channels\n"
     )
 
 
@@ -147,7 +147,7 @@ def load_files(subject):
 
 
 def get_gaze_segments(raw, onsets, x_channel, y_channel, tmin, tmax):
-    """Return arrays shaped n_trials x n_times for x and y."""
+    """Return arrays shaped n_trials x n_times for x and y"""
     sfreq = raw.info["sfreq"]
     n_times = int(round((tmax - tmin) * sfreq)) + 1
 
@@ -184,6 +184,16 @@ def get_gaze_segments(raw, onsets, x_channel, y_channel, tmin, tmax):
     times = np.arange(n_times) / sfreq + tmin
     return x_all, y_all, times
 
+def gaze_px_to_deg(x, y, x0, y0):
+    deg_per_px_x = SCENE_HFOV_DEG / SCENE_WIDTH_PX
+    deg_per_px_y = SCENE_VFOV_DEG / SCENE_HEIGHT_PX
+
+    dx_deg = (x - x0) * deg_per_px_x
+    dy_deg = (y - y0) * deg_per_px_y
+
+    dist_deg = np.sqrt(dx_deg ** 2 + dy_deg ** 2)
+
+    return dx_deg, dy_deg, dist_deg
 
 def compute_fixation_qc(
     x,
@@ -197,19 +207,22 @@ def compute_fixation_qc(
     stim_mask = (times >= STIM_START_S) & (times <= STIM_END_S)
 
     if not baseline_mask.any():
-        raise RuntimeError("No baseline samples available for fixation center.")
+        raise RuntimeError("No baseline samples available for fixation center")
     if not stim_mask.any():
-        raise RuntimeError("No stimulus samples available for fixation check.")
+        raise RuntimeError("No stimulus samples available for fixation check")
 
-    # Trial-wise fixation center from pre-stimulus baseline.
-    # This is robust to small calibration offsets between participants.
     x0 = np.nanmedian(x[:, baseline_mask], axis=1, keepdims=True)
     y0 = np.nanmedian(y[:, baseline_mask], axis=1, keepdims=True)
 
     x_stim = x[:, stim_mask]
     y_stim = y[:, stim_mask]
 
-    dist = np.sqrt((x_stim - x0) ** 2 + (y_stim - y0) ** 2)
+    dx_deg, dy_deg, dist = gaze_px_to_deg(
+        x_stim,
+        y_stim,
+        x0,
+        y0,
+    )
 
     valid = np.isfinite(dist)
     prop_missing = 1.0 - np.mean(valid, axis=1)
@@ -237,9 +250,9 @@ def compute_fixation_qc(
             "fix_y": y0[:, 0],
             "prop_inside": prop_inside,
             "prop_missing": prop_missing,
-            "median_dist": median_dist,
-            "p95_dist": p95_dist,
-            "max_dist": max_dist,
+            "median_dist_deg": median_dist,
+            "p95_dist_deg": p95_dist,
+            "max_dist_deg": max_dist,
             "bad_fixation": bad_fixation,
         }
     )
@@ -252,10 +265,7 @@ def process_subject(
     threshold,
     min_prop_inside,
     max_prop_missing,
-    x_channel=None,
-    y_channel=None,
     dry_run=False,
-    list_channels=False,
 ):
     sub = f"sub-{subject}"
     print("\n" + "=" * 80)
@@ -267,13 +277,7 @@ def process_subject(
     print(f"Reading raw gaze source:\n  {raw_file}")
     raw = mne.io.read_raw_eeglab(raw_file, preload=False, verbose="ERROR")
 
-    if list_channels:
-        print("\nChannels in original raw file:")
-        for ch in raw.ch_names:
-            print(f"  {ch}")
-        return
-
-    x_channel, y_channel = guess_gaze_channels(raw, x_channel, y_channel)
+    x_channel, y_channel = guess_gaze_channels(raw)
     print(f"Using gaze channels: x={x_channel}, y={y_channel}")
 
     print(f"Reading events:\n  {events_file}")
@@ -289,7 +293,7 @@ def process_subject(
         if len(selection) != len(epochs):
             raise RuntimeError(
                 f"Mismatch between events.tsv rows ({len(events)}), "
-                f"epochs ({len(epochs)}), and epochs.selection ({len(selection)})."
+                f"epochs ({len(epochs)}), and epochs.selection ({len(selection)})"
             )
 
         if selection.max() >= len(events):
@@ -299,8 +303,8 @@ def process_subject(
             )
 
         print(
-            f"events.tsv has {len(events)} rows but epochs has {len(epochs)} rows.\n"
-            f"Using epochs.selection to keep the events retained by MNE."
+            f"events.tsv has {len(events)} rows but epochs has {len(epochs)} rows\n"
+            f"Using epochs.selection to keep the events retained by MNE"
         )
 
         events = events.iloc[selection].reset_index(drop=True)
@@ -324,7 +328,7 @@ def process_subject(
         max_prop_missing=max_prop_missing,
     )
 
-    # Add metadata/event columns to QC output.
+    # Add metadata/event columns to QC output
     qc = pd.concat(
         [
             qc,
@@ -345,10 +349,17 @@ def process_subject(
     n_total = len(qc)
     print(f"Bad fixation trials: {n_bad}/{n_total} ({n_bad / n_total:.1%})")
     print(f"Saved QC table:\n  {qc_file}")
+    summary_row = {
+        "subject": sub,
+        "trials": n_total,
+        "rejected": n_bad,
+        "percent_rejected": 100 * n_bad / n_total,
+        "median_p95_deg": qc["p95_dist_deg"].median(),
+    }
 
     if dry_run:
-        print("Dry run only: epochs were not modified.")
-        return
+        print("Dry run only: epochs were not modified")
+        return summary_row
 
     bad_mask = qc["bad_fixation"].to_numpy(dtype=bool)
 
@@ -361,6 +372,7 @@ def process_subject(
     epochs_fix.save(out_epochs_file, overwrite=True)
 
     print(f"Saved fixation-cleaned epochs:\n  {out_epochs_file}")
+    return summary_row
 
 
 def main():
@@ -369,50 +381,12 @@ def main():
         "--sub",
         type=str,
         default=None,
-        help="Subject to process, e.g. 15 or 015. If omitted, runs all derivative subjects.",
-    )
-    parser.add_argument(
-        "--threshold",
-        type=float,
-        default=DEFAULT_THRESHOLD,
-        help=(
-            "Fixation radius in gaze-channel units. "
-            "Default is only a starting value; tune after inspection."
-        ),
-    )
-    parser.add_argument(
-        "--min-prop-inside",
-        type=float,
-        default=DEFAULT_MIN_PROP_INSIDE,
-        help="Minimum proportion of stimulus samples inside fixation window.",
-    )
-    parser.add_argument(
-        "--max-prop-missing",
-        type=float,
-        default=DEFAULT_MAX_PROP_MISSING,
-        help="Maximum allowed proportion of missing gaze samples.",
-    )
-    parser.add_argument(
-        "--x-channel",
-        type=str,
-        default=None,
-        help="Explicit gaze x channel name if auto-detection fails.",
-    )
-    parser.add_argument(
-        "--y-channel",
-        type=str,
-        default=None,
-        help="Explicit gaze y channel name if auto-detection fails.",
+        help="Subject to process, e.g. 15 or 015. If omitted, runs all derivative subjects",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Only write QC CSV; do not drop epochs or save fixation-cleaned epochs.",
-    )
-    parser.add_argument(
-        "--list-channels",
-        action="store_true",
-        help="Print original raw channel names and exit.",
+        help="Only write QC CSV; do not drop epochs or save fixation-cleaned epochs",
     )
 
     args = parser.parse_args()
@@ -425,18 +399,28 @@ def main():
 
     if not subjects:
         raise RuntimeError(f"No subjects found in {DERIV_ROOT}")
+    
+    summary_rows = []
 
     for sub in subjects:
-        process_subject(
+        summary_row = process_subject(
             subject=sub,
-            threshold=args.threshold,
-            min_prop_inside=args.min_prop_inside,
-            max_prop_missing=args.max_prop_missing,
-            x_channel=args.x_channel,
-            y_channel=args.y_channel,
+            threshold=DEFAULT_THRESHOLD_DEG,
+            min_prop_inside=DEFAULT_MIN_PROP_INSIDE,
+            max_prop_missing=DEFAULT_MAX_PROP_MISSING,
             dry_run=args.dry_run,
-            list_channels=args.list_channels,
         )
+
+        if summary_row is not None:
+            summary_rows.append(summary_row)
+    
+    if summary_rows:
+        summary = pd.DataFrame(summary_rows)
+
+        summary_file = OUT_ROOT / "fixation_qc_summary.csv"
+        summary.to_csv(summary_file, index=False)
+
+        print(f"\nSaved fixation QC summary:\n  {summary_file}")
 
     print("\nDone.")
 
