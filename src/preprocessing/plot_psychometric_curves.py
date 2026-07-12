@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_ROOT = PROJECT_ROOT / "data"
 
@@ -39,6 +39,11 @@ SUBJECTS = [
     "sub-021",
     "sub-022",
     "sub-023",
+    "sub-024",
+    "sub-026",
+    "sub-027",
+    "sub-030",
+    "sub-031",
 ]
 
 

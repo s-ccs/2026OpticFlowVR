@@ -1,11 +1,12 @@
+import os
 from pathlib import Path
 import argparse
 import subprocess
 import sys
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SRC = PROJECT_ROOT / "src"
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def normalize_subject(sub):
@@ -22,7 +23,15 @@ def run_command(command, description):
     print("=" * 80)
     print(" ".join(command))
 
-    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(PROJECT_ROOT / "src")
+
+    subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        check=True,
+        env=env,
+    )
 
 
 def main():
@@ -43,7 +52,7 @@ def main():
     # 1. Clean BIDS dataset
     clean_cmd = [
         sys.executable,
-        str(SRC / "cleanup_bids_for_mne_pipeline.py"),
+        str(SCRIPT_DIR / "cleanup_bids_for_mne_pipeline.py"),
     ]
 
     if subject is not None:
@@ -54,7 +63,7 @@ def main():
     # 2. Run MNE-BIDS-Pipeline
     mne_cmd = [
         "mne_bids_pipeline",
-        f"--config={SRC / 'config_mne_bids_pipeline.py'}",
+        f"--config={SCRIPT_DIR / 'config_mne_bids_pipeline.py'}",
         "--steps=preprocessing",
     ]
 
@@ -66,7 +75,7 @@ def main():
     # 3. Reject trials with poor fixation
     fixation_cmd = [
         sys.executable,
-        str(SRC / "fixation_check.py"),
+        str(SCRIPT_DIR / "fixation_check.py"),
     ]
 
     if subject is not None:
@@ -77,17 +86,17 @@ def main():
     # 4. Plot ERPs and psychometric curves
     condition_cmd = [
         sys.executable,
-        str(SRC / "plot_condition_erps.py"),
+        str(SCRIPT_DIR / "plot_condition_erps.py"),
     ]
 
     group_cmd = [
         sys.executable,
-        str(SRC / "plot_group_erps.py"),
+        str(SCRIPT_DIR / "plot_group_erps.py"),
     ]
 
     psychometric_cmd = [
         sys.executable,
-        str(SRC / "plot_psychometric_curves.py"),
+        str(SCRIPT_DIR / "plot_psychometric_curves.py"),
     ]
 
     if subject is not None:

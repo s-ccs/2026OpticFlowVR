@@ -12,10 +12,10 @@ import pandas as pd
 import mne
 import numpy as np
 
-from bad_channels import BAD_CHANNELS
+from preprocessing.bad_channels import BAD_CHANNELS
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 BIDS_ROOT = PROJECT_ROOT / "data"
 CLEAN_ROOT = PROJECT_ROOT / "data_clean"
@@ -134,7 +134,17 @@ def detect_bad_channels_with_pyprep(raw, subject, log_file=None):
 
 
 def create_clean_dataset_copy(subject=None, log_file=None):
-    """Copy BIDS dataset, excluding pilot subjects"""
+    """Copy BIDS dataset, excluding pilot subjects."""
+
+    def make_tree_writable(root):
+        """Add user-write permission to all copied files and directories."""
+        root.chmod(root.stat().st_mode | 0o700)
+
+        for path in root.rglob("*"):
+            try:
+                path.chmod(path.stat().st_mode | 0o200)
+            except OSError:
+                pass
 
     # --------------------------------------------------
     # Full dataset
@@ -157,6 +167,7 @@ def create_clean_dataset_copy(subject=None, log_file=None):
             ignore=shutil.ignore_patterns("sub-001"),
         )
 
+        make_tree_writable(CLEAN_ROOT)
         return
 
     # --------------------------------------------------
@@ -166,9 +177,7 @@ def create_clean_dataset_copy(subject=None, log_file=None):
     dst_subject = CLEAN_ROOT / f"sub-{subject}"
 
     if not src_subject.exists():
-        raise FileNotFoundError(
-            f"Subject not found: {src_subject}"
-        )
+        raise FileNotFoundError(f"Subject not found: {src_subject}")
 
     CLEAN_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -187,6 +196,7 @@ def create_clean_dataset_copy(subject=None, log_file=None):
     )
 
     shutil.copytree(src_subject, dst_subject)
+    make_tree_writable(dst_subject)
 
 def clean_all_set_files(subject=None):
     if subject is None:
@@ -222,19 +232,33 @@ def clean_all_set_files(subject=None):
 
         all_bads = sorted(set(manual_bads + pyprep_bads))
 
-        if all_bads:
-            log(f"  Manual bad channels: {manual_bads}", log_file)
-            log(f"  PyPREP bad channels: {pyprep_bads}", log_file)
-            log(f"  Final bad channels for interpolation: {all_bads}", log_file)
+        eeg_bads = [
+            ch for ch in all_bads
+            if raw.get_channel_types(picks=[ch])[0] == "eeg"
+        ]
 
-            raw.info["bads"] = all_bads
+        eog_bads = [
+            ch for ch in all_bads
+            if raw.get_channel_types(picks=[ch])[0] == "eog"
+        ]
+
+        if eeg_bads:
+            log(f"  Bad EEG channels for interpolation: {eeg_bads}", log_file)
+
+            raw.info["bads"] = eeg_bads
 
             montage = mne.channels.make_standard_montage("standard_1020")
             raw.set_montage(montage, on_missing="ignore")
 
             raw.interpolate_bads(reset_bads=True)
+
+        if eog_bads:
+            log(f"  Bad EOG channels, not interpolated: {eog_bads}", log_file)
+
+            # Keep these marked as bad after EEG interpolation.
+            raw.info["bads"] = eog_bads
         else:
-            log("  No bad EEG channels marked.", log_file)
+            raw.info["bads"] = []
 
         raw.export(set_file, fmt="eeglab", overwrite=True)
         log(f"Saved cleaned file: {set_file}", log_file)

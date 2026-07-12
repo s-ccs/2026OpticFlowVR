@@ -1,6 +1,6 @@
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 bids_root = PROJECT_ROOT / "data_clean"
 
@@ -34,6 +34,11 @@ subjects = [
     "021",
     "022",
     "023",
+    "024",
+    "026",
+    "027",
+    "030",
+    "031"
 ]
 sessions = ["001"]
 task = "compareSpeed"
