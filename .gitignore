@@ -6,6 +6,7 @@
 /data
 /data_clean
 /output
+/output-iclabel
 #/videos
 #/plots
 #/notebooks

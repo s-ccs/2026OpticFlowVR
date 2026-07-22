@@ -7,16 +7,16 @@ project_root = dirname(dirname(dirname(@__FILE__)))
 
 input_root = joinpath(
     project_root,
-    "output",
+    "output-iclabel",
     "unfold_results",
-    "all_subjects",
+    "all_subjects_conditionSpline",
 )
 
 out_root = joinpath(
     project_root,
-    "output",
+    "output-iclabel",
     "unfold_results",
-    "group_stats",
+    "group_stats_conditionSpline",
 )
 
 mkpath(out_root)

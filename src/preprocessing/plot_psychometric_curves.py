@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_ROOT = PROJECT_ROOT / "data"
 
-GROUP_OUT = PROJECT_ROOT / "output" / "group" / "psychometric_plots"
+GROUP_OUT = PROJECT_ROOT / "output-iclabel" / "group" / "psychometric_plots"
 GROUP_OUT.mkdir(parents=True, exist_ok=True)
 
 SUBJECTS = [
@@ -44,6 +44,9 @@ SUBJECTS = [
     "sub-027",
     "sub-030",
     "sub-031",
+    "sub-032",
+    "sub-034",
+    "sub-035",
 ]
 
 

@@ -11,16 +11,16 @@ const PROJECT_ROOT = dirname(dirname(dirname(@__FILE__)))
 
 const COEF_ROOT = joinpath(
     PROJECT_ROOT,
-    "output",
+    "output-iclabel",
     "unfold_results",
-    "all_subjects",
+    "all_subjects_conditionSpline",
 )
 
 const OUT_ROOT = joinpath(
     PROJECT_ROOT,
-    "output",
+    "output-iclabel",
     "unfold_results",
-    "cluster_stats_4cond_posterior_100_600ms_pymne",
+    "conditionSpline_cluster_stats_4cond_posterior_100_600ms_pymne",
 )
 
 mkpath(OUT_ROOT)
@@ -36,13 +36,25 @@ const RANDOM_SEED = 42
 const SFREQ = 250.0
 
 const POSTERIOR_ROI = [
-    "O1",
-    "O2",
-    "POz",
-    "PO3",
-    "PO4",
+    "P7",
+    "P5",
+    "P3",
+    "P1",
+    "Pz",
+    "P2",
+    "P4",
+    "P6",
+    "P8",
+
     "PO7",
+    "PO3",
+    "POz",
+    "PO4",
     "PO8",
+
+    "O1",
+    "Oz",
+    "O2",
 ]
 
 const TIME_MIN = 0.100
@@ -52,10 +64,30 @@ const COEFFICIENTS = [
     "condition: Random",
     "condition: Rotation",
     "condition: Spiral",
-    "speed_centered",
-    "condition: Random & speed_centered",
-    "condition: Rotation & speed_centered",
-    "condition: Spiral & speed_centered",
+
+    # Main spline effects (Forward)
+    "spl(speed,1)",
+    "spl(speed,2)",
+    "spl(speed,3)",
+    "spl(speed,4)",
+
+    # Random x spline
+    "condition: Random & spl(speed,1)",
+    "condition: Random & spl(speed,2)",
+    "condition: Random & spl(speed,3)",
+    "condition: Random & spl(speed,4)",
+
+    # Rotation x spline
+    "condition: Rotation & spl(speed,1)",
+    "condition: Rotation & spl(speed,2)",
+    "condition: Rotation & spl(speed,3)",
+    "condition: Rotation & spl(speed,4)",
+
+    # Spiral x spline
+    "condition: Spiral & spl(speed,1)",
+    "condition: Spiral & spl(speed,2)",
+    "condition: Spiral & spl(speed,3)",
+    "condition: Spiral & spl(speed,4)",
 ]
 
 const np = pyimport("numpy")

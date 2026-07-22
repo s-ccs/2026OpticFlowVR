@@ -8,15 +8,41 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-EPOCH_ROOT = PROJECT_ROOT / "output" / "derivatives" / "mne-bids-pipeline"
-OUT_ROOT = PROJECT_ROOT / "output" / "unfold_export"
+EPOCH_ROOT = PROJECT_ROOT / "output" / "derivatives" / "mne-bids-pipeline-iclabel"
+OUT_ROOT = PROJECT_ROOT / "output-iclabel" / "unfold_export"
 OUT_ROOT.mkdir(parents=True, exist_ok=True)
 
 SUBJECTS = [
-    "sub-002", "sub-003", "sub-004", "sub-005", "sub-006", "sub-007", "sub-008", # "sub-009",
-    "sub-010", "sub-011", "sub-012", "sub-013", "sub-014", "sub-015", "sub-016",
-    "sub-018", "sub-019", "sub-020", "sub-021", "sub-022", "sub-023", "sub-024",
-    "sub-026", "sub-027", "sub-030", "sub-031",
+    "sub-002", 
+    "sub-003", 
+    "sub-004", 
+    "sub-005", 
+    "sub-006", 
+    "sub-007", 
+    "sub-008", 
+    # "sub-009",
+    "sub-010", 
+    "sub-011", 
+    "sub-012", 
+    "sub-013", 
+    "sub-014", 
+    "sub-015", 
+    "sub-016",
+    "sub-018", 
+    "sub-019", 
+    "sub-020", 
+    "sub-021", 
+    "sub-022", 
+    "sub-023", 
+    "sub-024",
+    "sub-026", 
+    "sub-027", 
+    "sub-029",
+    "sub-030", 
+    "sub-031", 
+    "sub-032",
+    "sub-034",
+    "sub-035",
 ]
 
 SPEED_MAP = {

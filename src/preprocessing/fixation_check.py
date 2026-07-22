@@ -15,10 +15,10 @@ DERIV_ROOT = (
     PROJECT_ROOT
     / "output"
     / "derivatives"
-    / "mne-bids-pipeline"
+    / "mne-bids-pipeline-iclabel"
 )
 
-OUT_ROOT = PROJECT_ROOT / "output" / "fixation"
+OUT_ROOT = PROJECT_ROOT / "output-iclabel" / "fixation-iclabel"
 
 SESSION = "001"
 TASK = "compareSpeed"

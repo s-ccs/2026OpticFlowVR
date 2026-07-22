@@ -4,10 +4,11 @@ using CSV
 using NPZ
 using StatsModels
 using CategoricalArrays
+using BSplineKit
 
 project_root = dirname(dirname(dirname(@__FILE__)))
-export_root = joinpath(project_root, "output", "unfold_export")
-out_root = joinpath(project_root, "output", "unfold_results", "all_subjects")
+export_root = joinpath(project_root, "output-iclabel", "unfold_export")
+out_root = joinpath(project_root, "output-iclabel", "unfold_results", "all_subjects_conditionSpline")
 mkpath(out_root)
 
 subjects = [
@@ -15,7 +16,8 @@ subjects = [
     # "sub-009",  # excluded, missing condition x speed cells
     "sub-010", "sub-011", "sub-012", "sub-013", "sub-014", "sub-015", "sub-016",
     "sub-018", "sub-019", "sub-020", "sub-021", "sub-022", "sub-023", "sub-024",
-    "sub-026", "sub-027", "sub-030", "sub-031",
+    "sub-026", "sub-027", "sub-029", "sub-030", "sub-031", "sub-032", "sub-034",
+    "sub-035",
 ]
 
 condition_levels = [
@@ -25,7 +27,7 @@ condition_levels = [
     "Spiral",
 ]
 
-f = @formula(0 ~ 1 + condition * speed_centered)
+f = @formula(0 ~ 1 + condition * spl(speed, 5))
 
 summary_rows = DataFrame(
     subject = String[],
@@ -60,7 +62,7 @@ for subject in subjects
         events.condition = categorical(events.condition)
         levels!(events.condition, condition_levels)
         events.speed = Float64.(events.speed)
-        events.speed_centered = events.speed .- 1.4
+        # events.speed_centered = events.speed .- 1.4
 
         println("Fitting model: ", f)
 

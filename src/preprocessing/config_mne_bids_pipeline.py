@@ -8,7 +8,7 @@ deriv_root = (
     PROJECT_ROOT
     / "output"
     / "derivatives"
-    / "mne-bids-pipeline"
+    / "mne-bids-pipeline-iclabel"
 )
 
 subjects = [
@@ -69,6 +69,11 @@ notch_freq = 50.0
 raw_resample_sfreq = 250
 
 spatial_filter = "ica"
+
+ica_use_icalabel = True
+ica_l_freq = 1.0
+ica_h_freq = 100.0
+ica_algorithm = "picard-extended_infomax"
 ica_reject = {"eeg": 600e-6}
 reject = {"eeg": 300e-6}
 

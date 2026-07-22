@@ -11,8 +11,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SESSION = "001"
 TASK = "compareSpeed"
 
-DERIV_ROOT = PROJECT_ROOT / "output" / "derivatives" / "mne-bids-pipeline"
-PLOTS_ROOT = PROJECT_ROOT / "output" 
+DERIV_ROOT = PROJECT_ROOT / "output" / "derivatives" / "mne-bids-pipeline-iclabel"
+PLOTS_ROOT = PROJECT_ROOT / "output-iclabel" 
 
 SUBJECTS = [
     "002",
@@ -37,6 +37,12 @@ SUBJECTS = [
     "021",
     "022",
     "023",
+    "024",
+    "026",
+    "027",
+    "030",
+    "031",
+    "032"
 ]
 
 CONDITIONS = [
