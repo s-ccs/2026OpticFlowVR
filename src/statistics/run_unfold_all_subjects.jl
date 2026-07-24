@@ -8,15 +8,39 @@ using BSplineKit
 
 project_root = dirname(dirname(dirname(@__FILE__)))
 export_root = joinpath(project_root, "output-iclabel", "unfold_export")
-out_root = joinpath(project_root, "output-iclabel", "unfold_results", "all_subjects_conditionSpline")
+out_root = joinpath(project_root, "output-iclabel", "unfold_results", "all_subjects")
 mkpath(out_root)
 
 subjects = [
-    "sub-002", "sub-003", "sub-004", "sub-005", "sub-006", "sub-007", "sub-008",
-    # "sub-009",  # excluded, missing condition x speed cells
-    "sub-010", "sub-011", "sub-012", "sub-013", "sub-014", "sub-015", "sub-016",
-    "sub-018", "sub-019", "sub-020", "sub-021", "sub-022", "sub-023", "sub-024",
-    "sub-026", "sub-027", "sub-029", "sub-030", "sub-031", "sub-032", "sub-034",
+    "sub-002", 
+    "sub-003", 
+    "sub-004", 
+    "sub-005", 
+    "sub-006", 
+    # "sub-007",  # exluded: abnormal PSD signal
+    "sub-008",
+    # "sub-009",  # excluded: missing condition x speed cells
+    "sub-010", 
+    "sub-011", 
+    "sub-012", 
+    "sub-013", 
+    "sub-014", 
+    "sub-015", 
+    "sub-016",
+    # "sub-018",  # excluded: ERP not reproducable across trials
+    "sub-019", 
+    # "sub-020",  # excluded: all posterior channels are interpolated
+    "sub-021", 
+    "sub-022", 
+    "sub-023", 
+    "sub-024",
+    "sub-026", 
+    "sub-027", 
+    "sub-029", 
+    "sub-030", 
+    "sub-031", 
+    "sub-032", 
+    "sub-034",
     "sub-035",
 ]
 
@@ -27,7 +51,7 @@ condition_levels = [
     "Spiral",
 ]
 
-f = @formula(0 ~ 1 + condition * spl(speed, 5))
+f = @formula(0 ~ 1 + condition + spl(speed, 5))
 
 summary_rows = DataFrame(
     subject = String[],
@@ -72,7 +96,7 @@ for subject in subjects
         ct.subject .= subject
         ct.channel_name = [channels[ch] for ch in ct.channel]
         # Convert beta estimates from volts to microvolts
-        ct.estimate_uV = ct.estimate .* 1_000_000
+        ct.estimate_uV = ct.estimate
 
         # Reorder columns for readability
         ct = ct[:, [

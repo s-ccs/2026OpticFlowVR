@@ -9,6 +9,12 @@ using BSplineKit
 
 const PROJECT_ROOT = dirname(dirname(dirname(@__FILE__)))
 const COEF_ROOT = joinpath(PROJECT_ROOT, "output-iclabel", "unfold_results", "all_subjects")
+const CLUSTER_ROOT = joinpath(
+    PROJECT_ROOT,
+    "output-iclabel",
+    "unfold_results",
+    "cluster_stats_4cond_posterior_100_1200ms_pymne",
+)
 const EXPORT_ROOT = joinpath(PROJECT_ROOT, "output-iclabel", "unfold_export")
 const OUT_ROOT = joinpath(PROJECT_ROOT, "output-iclabel", "unfold_results", "plots")
 mkpath(OUT_ROOT)
@@ -96,6 +102,35 @@ function reconstruct_subject(coefficient_file::AbstractString)
     return subject, predicted, times, predictor_names
 end
 
+function load_significant_speed_clusters()
+    cluster_file = joinpath(
+        CLUSTER_ROOT,
+        "spl(speed,1)_clusters.csv",
+    )
+
+    isfile(cluster_file) ||
+        error("Speed cluster file not found: $cluster_file")
+
+    clusters = CSV.read(cluster_file, DataFrame)
+
+    significant = filter(
+        row -> row.significant == true,
+        clusters,
+    )
+
+    isempty(significant) &&
+        error(
+            "No significant spl(speed,1) clusters found in: " *
+            cluster_file
+        )
+
+    println("Significant spl(speed,1) clusters:")
+    show(significant; allcols=true)
+    println()
+
+    return significant
+end
+
 function main()
     println("Reconstructing spline predictions...")
     subjects = String[]
@@ -132,6 +167,7 @@ function main()
 
     group_mean = dropdims(mean(predictions; dims=1), dims=1)
     group_sem = dropdims(std(predictions; dims=1, corrected=true), dims=1) ./ sqrt(size(predictions, 1))
+    significant_speed_clusters = load_significant_speed_clusters()
 
     prediction_rows = DataFrame(speed=Float64[], time=Float64[], mean_prediction_uV=Float64[], sem_uV=Float64[], n_subjects=Int[])
     for speed_i in eachindex(SPEEDS), time_i in eachindex(times)
@@ -153,13 +189,16 @@ function main()
         title="Reconstructed nonlinear speed effect\nForward condition, posterior ROI",
         xticks = -0.2:0.1:0.8,
     )
+    for cluster in eachrow(significant_speed_clusters)
+        vspan!(ax_lines, cluster.time_start, cluster.time_end; color=(:gray, 0.18))
+    end
     for speed_i in eachindex(SPEEDS)
         lines!(ax_lines, times, vec(group_mean[speed_i, :]); linewidth=2.5, label="$(SPEEDS[speed_i]) m/s")
     end
     vlines!(ax_lines, [0.0]; color=:black, linewidth=1)
     hlines!(ax_lines, [0.0]; color=:black, linewidth=1)
     axislegend(ax_lines; position=:lt, nbanks=2)
-    line_file = joinpath(OUT_ROOT, "reconstructed_speed_effect.png")
+    line_file = joinpath(OUT_ROOT, "reconstructed_speed_effect_with_cluster.png")
     save(line_file, fig_lines; px_per_unit=2)
     println("Saved: ", line_file)
 
@@ -175,9 +214,18 @@ function main()
     heatmap_values = permutedims(group_mean, (2, 1))
     limit = maximum(abs, heatmap_values)
     hm = heatmap!(ax_heatmap, times, SPEEDS, heatmap_values; colormap=:RdBu, colorrange=(-limit, limit))
+    for cluster in eachrow(significant_speed_clusters)
+        vlines!(
+            ax_heatmap,
+            [
+                cluster.time_start,
+                cluster.time_end,
+            ];
+        color=:black, linewidth=2, linestyle=:dash)
+    end
     vlines!(ax_heatmap, [0.0]; color=:black, linewidth=1)
     Colorbar(fig_heatmap[1, 2], hm, label="Model-predicted amplitude (µV)")
-    heatmap_file = joinpath(OUT_ROOT, "reconstructed_speed_heatmap.png")
+    heatmap_file = joinpath(OUT_ROOT, "reconstructed_speed_heatmap_with_cluster.png")
     save(heatmap_file, fig_heatmap; px_per_unit=2)
     println("Saved: ", heatmap_file)
 

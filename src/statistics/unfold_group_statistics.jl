@@ -9,14 +9,14 @@ input_root = joinpath(
     project_root,
     "output-iclabel",
     "unfold_results",
-    "all_subjects_conditionSpline",
+    "all_subjects",
 )
 
 out_root = joinpath(
     project_root,
     "output-iclabel",
     "unfold_results",
-    "group_stats_conditionSpline",
+    "group_stats",
 )
 
 mkpath(out_root)

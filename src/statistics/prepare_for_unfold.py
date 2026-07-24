@@ -18,9 +18,9 @@ SUBJECTS = [
     "sub-004", 
     "sub-005", 
     "sub-006", 
-    "sub-007", 
+    # "sub-007", # exluded: abnormal PSD signal
     "sub-008", 
-    # "sub-009",
+    # "sub-009", # excluded: missing condition x speed cells
     "sub-010", 
     "sub-011", 
     "sub-012", 
@@ -28,9 +28,9 @@ SUBJECTS = [
     "sub-014", 
     "sub-015", 
     "sub-016",
-    "sub-018", 
+    # "sub-018", # excluded: ERP not reproducable across trials
     "sub-019", 
-    "sub-020", 
+    # "sub-020", # excluded: all posterior channels are interpolated
     "sub-021", 
     "sub-022", 
     "sub-023", 
@@ -134,7 +134,7 @@ def export_subject(subject: str) -> bool:
 
     # MNE gives data as trials x channels x time
     # Transform to Unfold-style as channels x time x trials
-    data = epochs.get_data(copy=True)
+    data = epochs.get_data(units=dict(eeg="uV",eog="uV"), copy=True)
     data = np.transpose(data, (1, 2, 0))
 
     times = epochs.times
@@ -158,7 +158,7 @@ def export_subject(subject: str) -> bool:
     )
 
     print(f"[OK] {subject}")
-    print(f"     data shape: {data.shape} = channels × times × trials")
+    print(f"     data shape: {data.shape} = channels x times x trials")
     print(f"     events: {events.shape}")
     print(f"     channels: {len(channels)}")
     print(f"     times: {times[0]:.3f} to {times[-1]:.3f} s")

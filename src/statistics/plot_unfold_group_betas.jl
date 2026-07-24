@@ -14,21 +14,21 @@ input_root = joinpath(
     project_root,
     "output-iclabel",
     "unfold_results",
-    "all_subjects_conditionSpline",
+    "all_subjects",
 )
 
 cluster_root = joinpath(
     project_root,
     "output-iclabel",
     "unfold_results",
-    "conditionSpline_cluster_stats_4cond_posterior_100_600ms_pymne",
+    "cluster_stats_4cond_posterior_100_1200ms_pymne",
 )
 
 out_root = joinpath(
     project_root,
     "output-iclabel",
     "unfold_results",
-    "plots_conditionSpline",
+    "plots",
 )
 
 mkpath(out_root)
@@ -166,6 +166,7 @@ function plot_beta(coef::String)
         xlabel="Time (s)",
         ylabel=coefficient_ylabel(coef),
         title=coef,
+        xticks=-0.2:0.1:1.2,
     )
 
     band!(
@@ -218,6 +219,7 @@ function plot_spline_basis_comparison()
         xlabel="Time (s)",
         ylabel="Spline basis coefficient β (µV)",
         title="Spline basis coefficients for speed",
+        xticks=-0.2:0.1:1.2,
     )
 
     for coef in spline_coefs
@@ -309,6 +311,7 @@ function plot_condition_comparison()
         xlabel="Time (s)",
         ylabel="β (µV)",
         title="Condition effects relative to Forward, controlling for nonlinear speed",
+        xticks=-0.2:0.1:1.2,
     )
 
     for coef in condition_coefs
@@ -387,6 +390,7 @@ function plot_random_with_clusters()
         xlabel="Time (s)",
         ylabel="β (µV)",
         title="Random relative to Forward",
+        xticks=-0.2:0.1:1.2,
     )
 
     band!(

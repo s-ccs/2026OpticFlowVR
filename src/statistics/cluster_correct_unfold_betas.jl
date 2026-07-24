@@ -4,6 +4,7 @@ using Statistics
 using Distributions
 using PythonCall
 using PyMNE
+using CairoMakie
 
 const pybuiltins = pyimport("builtins")
 
@@ -13,14 +14,14 @@ const COEF_ROOT = joinpath(
     PROJECT_ROOT,
     "output-iclabel",
     "unfold_results",
-    "all_subjects_conditionSpline",
+    "all_subjects",
 )
 
 const OUT_ROOT = joinpath(
     PROJECT_ROOT,
     "output-iclabel",
     "unfold_results",
-    "conditionSpline_cluster_stats_4cond_posterior_100_600ms_pymne",
+    "cluster_stats_4cond_posterior_100_1200ms_pymne",
 )
 
 mkpath(OUT_ROOT)
@@ -58,7 +59,8 @@ const POSTERIOR_ROI = [
 ]
 
 const TIME_MIN = 0.100
-const TIME_MAX = 0.600
+const TIME_MAX = 1.200
+const SAMPLE_INTERVAL = 1.0 / SFREQ
 
 const COEFFICIENTS = [
     "condition: Random",
@@ -72,22 +74,22 @@ const COEFFICIENTS = [
     "spl(speed,4)",
 
     # Random x spline
-    "condition: Random & spl(speed,1)",
-    "condition: Random & spl(speed,2)",
-    "condition: Random & spl(speed,3)",
-    "condition: Random & spl(speed,4)",
+    # "condition: Random & spl(speed,1)",
+    # "condition: Random & spl(speed,2)",
+    # "condition: Random & spl(speed,3)",
+    # "condition: Random & spl(speed,4)",
 
     # Rotation x spline
-    "condition: Rotation & spl(speed,1)",
-    "condition: Rotation & spl(speed,2)",
-    "condition: Rotation & spl(speed,3)",
-    "condition: Rotation & spl(speed,4)",
+    # "condition: Rotation & spl(speed,1)",
+    # "condition: Rotation & spl(speed,2)",
+    # "condition: Rotation & spl(speed,3)",
+    # "condition: Rotation & spl(speed,4)",
 
     # Spiral x spline
-    "condition: Spiral & spl(speed,1)",
-    "condition: Spiral & spl(speed,2)",
-    "condition: Spiral & spl(speed,3)",
-    "condition: Spiral & spl(speed,4)",
+    # "condition: Spiral & spl(speed,1)",
+    # "condition: Spiral & spl(speed,2)",
+    # "condition: Spiral & spl(speed,3)",
+    # "condition: Spiral & spl(speed,4)",
 ]
 
 const np = pyimport("numpy")
@@ -226,6 +228,96 @@ function make_channel_adjacency(channel_names::Vector{String})
     return adjacency
 end
 
+function plot_cluster_mask(
+    coefname::String,
+    cluster_index::Int,
+    cluster_mask::Matrix{Bool},
+    T_obs::Matrix{Float64},
+    times::Vector{Float64},
+    channel_names::Vector{String},
+    p_cluster::Float64,
+    is_significant::Bool,
+)
+    size(cluster_mask) == size(T_obs) ||
+        error("Cluster mask and T_obs have different dimensions.")
+
+    # Show only t-values belonging to this cluster.
+    masked_t = fill(NaN, size(T_obs))
+    masked_t[cluster_mask] .= T_obs[cluster_mask]
+
+    cluster_values = T_obs[cluster_mask]
+    isempty(cluster_values) &&
+        return
+
+    colour_limit = maximum(abs, cluster_values)
+
+    # Avoid a zero-width colour range.
+    colour_limit =
+        colour_limit == 0 ? 1.0 : colour_limit
+
+    time_ms = times .* 1000
+    channel_indices = collect(1:length(channel_names))
+
+    status =
+        is_significant ?
+        "significant" :
+        "not significant"
+
+    fig = Figure(size=(1100, 700))
+
+    ax = Axis(
+        fig[1, 1],
+        xlabel="Time (ms)",
+        ylabel="Channel",
+        title=(
+            "$coefname — cluster $cluster_index\n" *
+            "p = $(round(p_cluster; digits=4)), $status"
+        ),
+        yticks=(channel_indices, channel_names),
+    )
+
+    hm = heatmap!(
+        ax,
+        time_ms,
+        channel_indices,
+        masked_t;
+        colormap=:RdBu,
+        colorrange=(-colour_limit, colour_limit),
+    )
+
+    # Mark the analysed boundaries
+    vlines!(
+        ax,
+        [first(time_ms), last(time_ms)];
+        color=:black,
+        linestyle=:dash,
+        linewidth=1.5,
+    )
+
+    Colorbar(
+        fig[1, 2],
+        hm,
+        label="Observed t-value",
+    )
+
+    cluster_plot_dir = joinpath(
+        OUT_ROOT,
+        "cluster_masks",
+        safe_name(coefname),
+    )
+
+    mkpath(cluster_plot_dir)
+
+    outfile = joinpath(
+        cluster_plot_dir,
+        "cluster_$(lpad(cluster_index, 3, '0'))_" *
+        "$(status == "significant" ? "significant" : "nonsignificant").png",
+    )
+
+    save(outfile, fig; px_per_unit=2)
+    println("Saved cluster mask: ", outfile)
+end
+
 function run_cluster_test(df::DataFrame, coefname::String)
     println("\n", "="^80)
     println("Cluster test for: ", coefname)
@@ -287,33 +379,85 @@ function run_cluster_test(df::DataFrame, coefname::String)
         p_cluster=Float64[],
         significant=Bool[],
         cluster_mass=Float64[],
+        cluster_abs_mass=Float64[],
+        cluster_sign=String[],
         time_start=Float64[],
         time_end=Float64[],
+        duration_ms=Float64[],
         n_timepoints=Int[],
         n_channels=Int[],
         channels=String[],
         n_subjects=Int[],
+        touches_left_edge=Bool[],
+        touches_right_edge=Bool[],
+        distance_from_left_ms=Float64[],
+        distance_from_right_ms=Float64[],
     )
 
     significant_mask = falses(size(T_obs))
     n_clusters = pylen(clusters_py)
+    cluster_masks = Array{Bool, 3}(undef, n_clusters, length(times), length(channel_names))
+    name = safe_name(coefname)
 
     for python_index in 0:(n_clusters - 1)
-        cluster_mask = pyconvert(Array{Bool, 2}, clusters_py[python_index])
         julia_index = python_index + 1
+        cluster_mask = pyconvert(Array{Bool, 2}, clusters_py[python_index])
+        cluster_masks[julia_index, :, :] .= cluster_mask
         p_cluster = cluster_p_values[julia_index]
 
         time_mask = vec(any(cluster_mask; dims=2))
         channel_mask = vec(any(cluster_mask; dims=1))
         cluster_times = times[time_mask]
         cluster_channels = channel_names[channel_mask]
-        cluster_mass = sum(T_obs[cluster_mask])
+
+        cluster_t_values = T_obs[cluster_mask]
+        cluster_mass = sum(cluster_t_values)
+        cluster_abs_mass = sum(abs, cluster_t_values)
+
+        cluster_sign =
+            cluster_mass > 0 ? "positive" :
+            cluster_mass < 0 ? "negative" :
+            "mixed"
+
+        cluster_start = isempty(cluster_times) ? NaN : minimum(cluster_times)
+        cluster_end = isempty(cluster_times) ? NaN : maximum(cluster_times)
+
+        duration_ms =
+            isempty(cluster_times) ?
+            NaN :
+            (cluster_end - cluster_start + SAMPLE_INTERVAL) * 1000
+
+        touches_left_edge =
+            !isempty(cluster_times) &&
+            isapprox(cluster_start, first(times); atol=SAMPLE_INTERVAL / 10)
+        touches_right_edge =
+            !isempty(cluster_times) &&
+            isapprox(cluster_end, last(times); atol=SAMPLE_INTERVAL / 10)
+        distance_from_left_ms =
+            isempty(cluster_times) ?
+            NaN :
+            (cluster_start - first(times)) * 1000
+        distance_from_right_ms =
+            isempty(cluster_times) ?
+            NaN :
+            (last(times) - cluster_end) * 1000
 
         is_significant = p_cluster < ALPHA_CLUSTER
 
         if is_significant
             significant_mask .|= cluster_mask
         end
+
+        plot_cluster_mask(
+            coefname,
+            julia_index,
+            cluster_mask,
+            T_obs,
+            times,
+            channel_names,
+            p_cluster,
+            is_significant,
+        )
 
         push!(
             rows,
@@ -323,17 +467,24 @@ function run_cluster_test(df::DataFrame, coefname::String)
                 p_cluster,
                 is_significant,
                 cluster_mass,
-                isempty(cluster_times) ? NaN : minimum(cluster_times),
-                isempty(cluster_times) ? NaN : maximum(cluster_times),
+                cluster_abs_mass,
+                cluster_sign,
+                cluster_start,
+                cluster_end,
+                duration_ms,
                 length(cluster_times),
                 length(cluster_channels),
                 join(cluster_channels, ","),
                 n_subjects,
+                touches_left_edge,
+                touches_right_edge,
+                distance_from_left_ms,
+                distance_from_right_ms,
             ),
         )
     end
 
-    name = safe_name(coefname)
+    np.save(joinpath(OUT_ROOT, "$(name)_all_cluster_masks.npy"), cluster_masks)
     cluster_file = joinpath(
         OUT_ROOT,
         "$(name)_clusters.csv",

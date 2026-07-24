@@ -15,21 +15,21 @@ const INPUT_ROOT = joinpath(
     PROJECT_ROOT,
     "output-iclabel",
     "unfold_results",
-    "all_subjects_conditionSpline",
+    "all_subjects",
 )
 
 const CLUSTER_ROOT = joinpath(
     PROJECT_ROOT,
     "output-iclabel",
     "unfold_results",
-    "conditionSpline_cluster_stats_4cond_posterior_100_600ms_pymne",
+    "cluster_stats_4cond_posterior_100_1200ms_pymne",
 )
 
 const OUT_ROOT = joinpath(
     PROJECT_ROOT,
     "output-iclabel",
     "unfold_results",
-    "plots_conditionSpline",
+    "plots",
 )
 
 mkpath(OUT_ROOT)
