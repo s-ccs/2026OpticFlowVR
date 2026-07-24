@@ -12,7 +12,7 @@ import pandas as pd
 import mne
 import numpy as np
 
-from preprocessing.bad_channels import BAD_CHANNELS
+from bad_channels import BAD_CHANNELS
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -118,14 +118,8 @@ def detect_bad_channels_with_pyprep(raw, subject, log_file=None):
     montage = mne.channels.make_standard_montage("standard_1020")
     raw_eeg.set_montage(montage, on_missing="ignore")
 
-    noisy = NoisyChannels(
-        raw_eeg,
-        do_detrend=True,
-        random_state=42,
-    )
-
+    noisy = NoisyChannels(raw_eeg, do_detrend=True, random_state=42)
     noisy.find_all_bads()
-
     pyprep_bads = noisy.get_bads()
 
     log(f"  PyPREP bad channels: {pyprep_bads}", log_file)

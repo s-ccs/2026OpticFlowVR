@@ -37,8 +37,12 @@ subjects = [
     "024",
     "026",
     "027",
+    "029",
     "030",
-    "031"
+    "031",
+    "032",
+    "034",
+    "035",
 ]
 sessions = ["001"]
 task = "compareSpeed"
@@ -78,4 +82,4 @@ ica_reject = {"eeg": 600e-6}
 reject = {"eeg": 300e-6}
 
 epochs_tmin = -0.2
-epochs_tmax = 0.8
+epochs_tmax = 1.2

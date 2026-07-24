@@ -42,7 +42,9 @@ SUBJECTS = [
     "027",
     "030",
     "031",
-    "032"
+    "032",
+    "034",
+    "035",
 ]
 
 CONDITIONS = [
@@ -70,6 +72,7 @@ CHANNEL_GROUPS = {
     "posterior": ["O1", "O2", "POz", "PO3", "PO4", "PO7", "PO8"],
     "central": ["FCz", "Cz", "CP1", "CP2", "Pz"],
     "fcz": ["FCz"],
+    "pz": ["Pz"],
 }
 
 TIME_WINDOWS = {
