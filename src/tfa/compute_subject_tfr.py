@@ -70,8 +70,8 @@ def process_subject(subject: str, overwrite: bool = False) -> Path:
     power.apply_baseline(BASELINE, mode=BASELINE_MODE)
     power.crop(tmin=ANALYSIS_TMIN, tmax=ANALYSIS_TMAX)
 
-    # Crucial order: calculate channel-level power first, then average ROI power.
-    # Shape before mean: epochs × channels × frequencies × times.
+    # Calculate channel-level power first, then average ROI power
+    # Shape before mean: epochs x channels x frequencies x times.
     roi_power = power.get_data().mean(axis=1).astype(np.float32)
 
     metadata = power.metadata.copy().reset_index(drop=True)
@@ -91,7 +91,7 @@ def process_subject(subject: str, overwrite: bool = False) -> Path:
 
     print(
         f"Saved sub-{subject}: {roi_power.shape} "
-        "(trials × frequencies × times)\n"
+        "(trials x frequencies x times)\n"
         f"  {out_file}\n  {metadata_file}"
     )
     return out_file
