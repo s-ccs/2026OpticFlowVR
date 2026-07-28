@@ -3,6 +3,8 @@ from collections import defaultdict
 
 import mne
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
+import numpy as np
 import pandas as pd
 
 
@@ -47,16 +49,27 @@ SUBJECTS = [
     "032",
     "034",
     "035",
+    "036",
+    "037",
+    "038",
+    "039",
+    "040",
 ]
 
+# Left/right directions are collapsed for condition-level analyses
 CONDITIONS = [
     "Forward",
-    "Rotation/Left",
-    "Rotation/Right",
-    "Spiral/Left",
-    "Spiral/Right",
+    "Rotation",
+    "Spiral",
     "Random",
 ]
+
+CONDITION_EVENT_NAMES = {
+    "Forward": ["Forward"],
+    "Rotation": ["Rotation/Left", "Rotation/Right"],
+    "Spiral": ["Spiral/Left", "Spiral/Right"],
+    "Random": ["Random"],
+}
 
 SPEED_LEVELS = {
     "speed-0": "0.8 m/s",
@@ -66,6 +79,15 @@ SPEED_LEVELS = {
     "speed-4": "1.6 m/s",
     "speed-5": "1.8 m/s",
     "speed-6": "2.0 m/s",
+}
+
+speed_colors = plt.cm.viridis(
+    np.linspace(0.05, 0.95, len(SPEED_LEVELS))
+)
+
+SPEED_COLORS = {
+    label: color
+    for label, color in zip(SPEED_LEVELS.values(), speed_colors)
 }
 
 CHANNEL_GROUPS = {
@@ -84,13 +106,15 @@ TIME_WINDOWS = {
 }
 
 FONT_SIZES = {
-    "title": 24,
-    "subtitle": 20,
-    "axis_label": 20,
-    "tick_label": 18,
-    "legend": 18,
+    "title": 16,
+    "subtitle": 16,
+    "axis_label": 14,
+    "tick_label": 12,
+    "legend": 12,
 }
 
+PLOT_TMIN = -0.2
+PLOT_TMAX = 0.8
 
 def get_epochs_file(subject):
     eeg_dir = (
@@ -116,7 +140,6 @@ def get_epochs_file(subject):
 
     return clean_file
 
-
 def load_subject_epochs(subject):
     epochs_file = get_epochs_file(subject)
 
@@ -127,18 +150,92 @@ def load_subject_epochs(subject):
     print(f"\nLoading sub-{subject}: {epochs_file}")
 
     epochs = mne.read_epochs(epochs_file, preload=True)
+
+    standard_montage = mne.channels.make_standard_montage("standard_1020")
+
+    epochs.set_montage(
+        standard_montage,
+        on_missing="warn",
+    )
+
+    fig = epochs.plot_sensors(
+        kind="topomap",
+        show_names=True,
+        show=False,
+        sphere=(0, 0, 0, 0.105),
+    )
+
+    fig.savefig(
+        OUT_DIR / "montage_check.png",
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close(fig)
+
     epochs.apply_baseline((-0.2, 0.0))
 
     print(epochs)
 
     for condition in CONDITIONS:
-        if condition in epochs.event_id:
-            print(f"  {condition}: {len(epochs[condition])}")
-        else:
+        try:
+            condition_epochs = select_condition_epochs(epochs, condition)
+            print(f"  {condition}: {len(condition_epochs)}")
+        except KeyError:
             print(f"  {condition}: missing")
 
     return epochs
 
+def select_condition_epochs(epochs, condition):
+    raw_conditions = CONDITION_EVENT_NAMES[condition]
+    matching_event_names = []
+
+    for event_name in epochs.event_id:
+        for raw_condition in raw_conditions:
+            if (
+                event_name == raw_condition
+                or event_name.startswith(f"{raw_condition}/")
+            ):
+                matching_event_names.append(event_name)
+                break
+
+    if not matching_event_names:
+        raise KeyError(
+            f"No events found for condition {condition}. "
+            f"Expected prefixes: {raw_conditions}"
+        )
+
+    return epochs[matching_event_names]
+
+def select_condition_speed_epochs(epochs, condition, speed_key):
+    event_names = [
+        f"{event_name}/{speed_key}"
+        for event_name in CONDITION_EVENT_NAMES[condition]
+        if f"{event_name}/{speed_key}" in epochs.event_id
+    ]
+    if not event_names:
+        raise KeyError(f"No events found for {condition}/{speed_key}")
+    return epochs[event_names]
+
+def compute_roi_mean_and_sem(evokeds, channels):
+    subject_waveforms = []
+    for evoked in evokeds:
+        available_channels = [ch for ch in channels if ch in evoked.ch_names]
+        if not available_channels:
+            continue
+        waveform_uv = evoked.copy().pick(available_channels).data.mean(axis=0) * 1e6
+        subject_waveforms.append(waveform_uv)
+
+    if not subject_waveforms:
+        return None
+
+    data = np.stack(subject_waveforms, axis=0)
+    mean = data.mean(axis=0)
+    if data.shape[0] < 2:
+        sem = np.zeros_like(mean)
+    else:
+        sem = data.std(axis=0, ddof=1) / np.sqrt(data.shape[0])
+
+    return mean, sem, data.shape[0]
 
 def collect_subject_evokeds():
     evokeds_by_condition = defaultdict(list)
@@ -159,7 +256,7 @@ def collect_subject_evokeds():
 
         for condition in CONDITIONS:
             try:
-                condition_epochs = epochs[condition]
+                condition_epochs = select_condition_epochs(epochs, condition)
             except KeyError:
                 print(f"Missing {condition} for sub-{subject}")
                 continue
@@ -198,7 +295,9 @@ def collect_subject_evokeds():
                 event_name = f"{condition}/{speed_key}"
 
                 try:
-                    selected_epochs = epochs[event_name]
+                    selected_epochs = select_condition_speed_epochs(
+                        epochs, condition, speed_key
+                    )
                 except KeyError:
                     print(f"Missing {event_name} for sub-{subject}")
                     continue
@@ -225,7 +324,6 @@ def collect_subject_evokeds():
 
     return evokeds_by_condition, evokeds_by_speed, evokeds_by_condition_speed, included_subjects, measure_rows
 
-
 def compute_grand_averages(evokeds_by_level):
     grand_averages = {}
 
@@ -239,7 +337,6 @@ def compute_grand_averages(evokeds_by_level):
         print(f"{level}: N={len(evokeds)} subjects")
 
     return grand_averages
-
 
 def extract_erp_measures(subject, evokeds_by_level, analysis_name):
     rows = []
@@ -299,118 +396,200 @@ def extract_erp_measures(subject, evokeds_by_level, analysis_name):
 
     return rows
 
-
-def plot_group_erps(grand_averages, included_subjects, analysis_name):
+def plot_group_erps(evokeds_by_level, included_subjects, analysis_name):
+    """Plot group ERPs with shaded SEM across participants"""
     for group_name, channels in CHANNEL_GROUPS.items():
+        first_evoked = next(
+            evoked
+            for evokeds in evokeds_by_level.values()
+            for evoked in evokeds
+        )
         available_channels = [
             ch for ch in channels
-            if ch in next(iter(grand_averages.values())).ch_names
+            if ch in first_evoked.ch_names
         ]
 
         if not available_channels:
             print(f"Skipping {group_name}: no available channels")
             continue
 
-        title = f"Group {group_name} ERP by {analysis_name}, N={len(included_subjects)}"
+        title = f"Group {group_name} ERP by {analysis_name}"
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-        fig = mne.viz.plot_compare_evokeds(
-            grand_averages,
-            picks=available_channels,
-            combine="mean",
-            show=False,
-            title=title,
+        for label, evokeds in evokeds_by_level.items():
+            result = compute_roi_mean_and_sem(
+                evokeds,
+                available_channels,
+            )
+
+            if result is None:
+                continue
+
+            mean_uv, sem_uv, n_subjects = result
+            times = evokeds[0].times
+            color = SPEED_COLORS.get(label)
+
+            line = ax.plot(
+                times,
+                mean_uv,
+                color=color,
+                linewidth=2,
+                label=f"{label}",
+            )[0]
+
+            ax.fill_between(
+                times,
+                mean_uv - sem_uv,
+                mean_uv + sem_uv,
+                color=line.get_color(),
+                alpha=0.12,
+                linewidth=0,
+            )
+
+        ax.axvline(
+            0,
+            linestyle="--",
+            color="black",
+            linewidth=1.2,
+        )
+        ax.axhline(
+            0,
+            color="black",
+            linewidth=1.0,
         )
 
-        style_compare_evokeds_figure(fig, title)
+        ax.set_title(title, fontsize=FONT_SIZES["title"])
+        ax.set_xlabel("Time (s)", fontsize=FONT_SIZES["axis_label"])
+        ax.set_ylabel("Amplitude (µV)", fontsize=FONT_SIZES["axis_label"])
+        ax.set_xlim(PLOT_TMIN, PLOT_TMAX)
+        ax.xaxis.set_major_locator(MultipleLocator(0.1))
+        ax.xaxis.set_major_formatter(FormatStrFormatter("%.1f"))
 
-        fig[0].savefig(
+        ax.tick_params(
+            axis="both",
+            labelsize=FONT_SIZES["tick_label"],
+        )
+        ax.legend(
+            loc="upper right",
+            fontsize=FONT_SIZES["legend"],
+        )
+
+        fig.tight_layout()
+        out_file = OUT_DIR / f"group_{group_name}_{analysis_name}-erps.png"
+        fig.savefig(
             OUT_DIR / f"group_{group_name}_{analysis_name}-erps.png",
             dpi=300,
             bbox_inches="tight",
         )
+        print(f"Saved SEM ERP plot: {out_file.resolve()}")
+        plt.close(fig)
 
-        plt.close(fig[0])
 
-
-def plot_group_subplots(grand_averages, included_subjects, group_name, labels, analysis_name):
+def plot_group_subplots(evokeds_by_level, included_subjects, group_name, labels, analysis_name):
     channels = CHANNEL_GROUPS[group_name]
-
-    available_channels = [
-        ch for ch in channels
-        if ch in next(iter(grand_averages.values())).ch_names
-    ]
-
+    first_evoked = next(
+        evoked for evokeds in evokeds_by_level.values() for evoked in evokeds
+    )
+    available_channels = [ch for ch in channels if ch in first_evoked.ch_names]
     if not available_channels:
         print(f"Skipping {group_name}: no available channels")
         return
 
     n_plots = len(labels)
-    n_cols = 3
+    n_cols = min(3, n_plots)
     n_rows = (n_plots + n_cols - 1) // n_cols
-
     fig, axes = plt.subplots(
-        n_rows,
-        n_cols,
-        figsize=(18, 4 * n_rows),
-        sharex=True,
-        sharey=True,
+        n_rows, n_cols, figsize=(6 * n_cols, 4 * n_rows),
+        sharex=True, sharey=True, squeeze=False,
     )
-
     axes = axes.ravel()
 
     for ax, label in zip(axes, labels):
-        if label not in grand_averages:
+        evokeds = evokeds_by_level.get(label, [])
+        if not evokeds:
             ax.set_title(f"{label} missing")
             ax.axis("off")
             continue
 
-        evoked = grand_averages[label].copy().pick(available_channels)
-        data_uv = evoked.data.mean(axis=0) * 1e6
+        result = compute_roi_mean_and_sem(evokeds, available_channels)
+        if result is None:
+            ax.set_title(f"{label} missing")
+            ax.axis("off")
+            continue
 
-        ax.plot(evoked.times, data_uv, linewidth=2)
+        mean_uv, sem_uv, n_subjects = result
+        times = evokeds[0].times
+        line = ax.plot(times, mean_uv, linewidth=2, label=label)[0]
+        ax.fill_between(
+            times, mean_uv - sem_uv, mean_uv + sem_uv,
+            color=line.get_color(), alpha=0.12, linewidth=0,
+        )
         ax.axvline(0, linestyle="--", color="black", linewidth=1.2)
         ax.axhline(0, color="black", linewidth=1.0)
-
-        ax.set_title(label, fontsize=FONT_SIZES["subtitle"])
+        ax.set_title(f"{label} (N={n_subjects})", fontsize=FONT_SIZES["subtitle"])
         ax.set_xlabel("Time (s)", fontsize=FONT_SIZES["axis_label"])
-        ax.set_ylabel("µV", fontsize=FONT_SIZES["axis_label"])
+        ax.set_ylabel("Amplitude (µV)", fontsize=FONT_SIZES["axis_label"])
+        ax.set_xlim(PLOT_TMIN, PLOT_TMAX)
+        ax.xaxis.set_major_locator(MultipleLocator(0.1))
+        ax.xaxis.set_major_formatter(FormatStrFormatter("%.1f"))
         ax.tick_params(axis="both", labelsize=FONT_SIZES["tick_label"])
 
     for ax in axes[n_plots:]:
         ax.axis("off")
 
     fig.suptitle(
-        f"Group {group_name} ERP by {analysis_name}, N={len(included_subjects)}",
+        f"Group {group_name} ERP by {analysis_name} (shading: SEM)",
         fontsize=FONT_SIZES["title"],
     )
-
     fig.tight_layout()
-
     fig.savefig(
         OUT_DIR / f"group_{group_name}_{analysis_name}-subplots.png",
-        dpi=300,
-        bbox_inches="tight",
+        dpi=300, bbox_inches="tight",
     )
-
     plt.close(fig)
 
-
 def plot_group_topomaps(grand_averages, included_subjects):
-    # Collapsed across conditions
+    # Collapse across the four condition grand averages
     all_evokeds = list(grand_averages.values())
     evoked_all = mne.grand_average(all_evokeds)
     evoked_all.comment = "All conditions"
 
+    topomap_times = [
+        0.10,
+        0.13,
+        0.15,
+        0.18,
+        0.20,
+        0.30,
+        0.40,
+        0.45,
+        0.50,
+        0.60,
+        0.70,
+        0.80,
+    ]
+
     fig = evoked_all.plot_topomap(
-        times=[0.10, 0.13, 0.15, 0.18, 0.20, 0.30, 0.40, 0.45, 0.50, 0.60],
+        times=topomap_times,
         vlim=(-3, 3),
         ch_type="eeg",
         show=False,
         time_unit="s",
+        time_format="%0.2f s",
+        nrows=2,
+        ncols=6,
+        size=2.0,
+        sphere=(0, 0, 0, 0.110),
+    )
+
+    fig.suptitle(
+        f"Grand-average scalp topographies across conditions",
+        fontsize=16,
     )
 
     fig.savefig(
-        OUT_DIR / f"group_all-conditions_topomaps_N-{len(included_subjects)}.png",
+        OUT_DIR
+        / f"group_all-conditions_topomaps_N-{len(included_subjects)}.png",
         dpi=300,
         bbox_inches="tight",
     )
@@ -427,7 +606,7 @@ def style_compare_evokeds_figure(fig, title):
 
     legend = ax.get_legend()
     if legend is not None:
-        legend.set_loc("lower right")
+        legend.set_loc("upper right")
 
         for text in legend.get_texts():
             text.set_fontsize(FONT_SIZES["legend"])
@@ -457,19 +636,19 @@ def main():
         print(f"Saved ERP measures to: {measures_file}")
 
     if condition_grand_averages:
-        plot_group_erps(condition_grand_averages, included_subjects, "condition")
+        plot_group_erps(evokeds_by_condition, included_subjects, "condition")
 
         for group_name in ["posterior", "parieto_occipital", "fcz"]:
-            plot_group_subplots(condition_grand_averages, included_subjects, group_name, CONDITIONS, "condition")
+            plot_group_subplots(evokeds_by_condition, included_subjects, group_name, CONDITIONS, "condition")
 
         plot_group_topomaps(condition_grand_averages, included_subjects)
         save_group_evokeds(condition_grand_averages, included_subjects, "condition")
 
     if speed_grand_averages:
-        plot_group_erps(speed_grand_averages, included_subjects, "speed")
+        plot_group_erps(evokeds_by_speed, included_subjects, "speed")
 
         for group_name in ["posterior", "parieto_occipital", "fcz"]:
-            plot_group_subplots(speed_grand_averages, included_subjects, group_name, list(SPEED_LEVELS.values()), "speed" )
+            plot_group_subplots(evokeds_by_speed, included_subjects, group_name, list(SPEED_LEVELS.values()), "speed")
 
         save_group_evokeds(speed_grand_averages, included_subjects, "speed")
 

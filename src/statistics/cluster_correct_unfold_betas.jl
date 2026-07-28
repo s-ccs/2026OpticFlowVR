@@ -315,7 +315,6 @@ function plot_cluster_mask(
     )
 
     save(outfile, fig; px_per_unit=2)
-    println("Saved cluster mask: ", outfile)
 end
 
 function run_cluster_test(df::DataFrame, coefname::String)

@@ -2,12 +2,12 @@ import mne
 import os
 from pathlib import Path
 
-sample_data_folder = Path("./data_clean/")
-raw_file = sample_data_folder / "sub-007" / "ses-001" / "eeg" / \
-    "sub-007_ses-001_task-compareSpeed_run-1_eeg.set"
+sample_data_folder = Path("./data/")
+raw_file = sample_data_folder / "sub-040" / "ses-001" / "eeg" / \
+    "sub-040_ses-001_task-compareSpeed_run-1_eeg.set"
 
 annot_file = raw_file.with_name(
-    "sub-007_ses-001_task-compareSpeed_run-1_manual-annot.fif"
+    "sub-040_ses-001_task-compareSpeed_run-1_manual-annot.fif"
 )
 
 raw = mne.io.read_raw_eeglab(raw_file, preload=True)

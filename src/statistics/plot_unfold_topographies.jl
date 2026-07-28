@@ -250,13 +250,14 @@ for index in 1:n_clusters
         contours=6,
         mask=mask_py,
         mask_params=mask_params_py,
+        sphere=(0, 0, 0, 0.110),
     )
 
     start_ms = round(Int, cluster.time_start * 1000)
     end_ms = round(Int, cluster.time_end * 1000)
 
     ax.set_title(
-        "$(start_ms)–$(end_ms) ms\n" *
+        "$(start_ms)-$(end_ms) ms\n" *
         "pcluster = $(round(cluster.p_cluster; digits=3))",
     )
 
@@ -270,9 +271,6 @@ for index in 1:n_clusters
     )
 end
 
-fig.suptitle(
-    "Random relative to Forward at 1.4 m/s",
-)
 fig.tight_layout()
 outfile = joinpath(OUT_ROOT, "condition_Random_cluster_topographies.png")
 fig.savefig(outfile; dpi=300, bbox_inches="tight")

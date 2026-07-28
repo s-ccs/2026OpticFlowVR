@@ -47,6 +47,11 @@ SUBJECTS = [
     "sub-032",
     "sub-034",
     "sub-035",
+    "sub-036",
+    "sub-037",
+    "sub-038",
+    "sub-039",
+    "sub-040",
 ]
 
 
@@ -111,9 +116,22 @@ def fit_binomial_logistic(summary):
 
     return result.x
 
+def wilson_interval(k, n, z=1.96):
+    """Wilson 95% confidence interval for a binomial proportion."""
+    k = np.asarray(k, dtype=float)
+    n = np.asarray(n, dtype=float)
+    p = k / n
+    denom = 1 + z**2 / n
+    centre = (p + z**2 / (2 * n)) / denom
+    half_width = (
+        z
+        * np.sqrt((p * (1 - p) / n) + (z**2 / (4 * n**2)))
+        / denom
+    )
+    return centre - half_width, centre + half_width
 
 def make_summary(df):
-    return (
+    summary = (
         df.groupby("currSpeedVal")
         .agg(
             p_faster=("answered_faster", "mean"),
@@ -123,18 +141,36 @@ def make_summary(df):
         .reset_index()
         .sort_values("currSpeedVal")
     )
-
+    summary["ci_low"], summary["ci_high"] = wilson_interval(
+        summary["n_faster"], summary["n"]
+    )
+    return summary
 
 def plot_psychometric(plot_df, title, out_path):
-    plt.figure(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    condition_order = ["Forward", "Random", "Rotation", "Spiral"]
 
-    for cond, cond_df in plot_df.groupby("cond"):
+    plot_df["cond"] = pd.Categorical(
+        plot_df["cond"],
+        categories=condition_order,
+        ordered=True,
+    )
+
+    for cond, cond_df in plot_df.groupby("cond", sort=False):
         summary = make_summary(cond_df)
 
         x = summary["currSpeedVal"].to_numpy()
         y = summary["p_faster"].to_numpy()
+        ci_low = summary["ci_low"].to_numpy()
+        ci_high = summary["ci_high"].to_numpy()
 
-        plt.scatter(x, y, label=f"{cond} data")
+        points = ax.scatter(
+            x,
+            y,
+            label=f"{cond} observed",
+        )
+
+        point_color = points.get_facecolor()[0]
 
         if len(summary) >= 4 and summary["p_faster"].nunique() > 1:
             params = fit_binomial_logistic(summary)
@@ -142,20 +178,70 @@ def plot_psychometric(plot_df, title, out_path):
             if params is not None:
                 x_fit = np.linspace(x.min(), x.max(), 200)
                 y_fit = logistic_from_params(x_fit, params[0], params[1])
-                plt.plot(x_fit, y_fit, label=f"{cond} fit")
+                ax.plot(
+                    x_fit,
+                    y_fit,
+                    color=point_color,
+                    label=f"{cond} logistic fit",
+                )
             else:
                 print(f"Fit failed for {title}, {cond}")
+    
+    ax.axhline(
+        0.5,
+        linestyle="--",
+        linewidth=1,
+        color="0.35",
+        label="Equal response probability (0.5)",
+    )
 
-    plt.axhline(0.5, linestyle="--", linewidth=1)
-    plt.xlabel("Current speed")
-    plt.ylabel("P(answered FASTER)")
-    plt.title(title)
-    plt.ylim(-0.05, 1.05)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=300)
-    plt.close()
+    handles, labels = ax.get_legend_handles_labels()
+    lookup = dict(zip(labels, handles))
 
+    desired = [
+        "Forward observed",
+        "Forward logistic fit",
+        "Random observed",
+        "Random logistic fit",
+        "Rotation observed",
+        "Rotation logistic fit",
+        "Spiral observed",
+        "Spiral logistic fit",
+        "Equal response probability (0.5)",
+    ]
+
+    ordered_labels = [label for label in desired if label in lookup]
+    ordered_handles = [lookup[label] for label in ordered_labels]
+
+    ax.legend(
+        ordered_handles,
+        ordered_labels,
+        ncol=2,
+        fontsize=9,
+        loc="upper left",
+    )
+
+    ax.set_xlabel("Stimulus speed (m/s)")
+    ax.set_ylabel("Probability of 'Faster' response")
+    ax.set_title(title)
+    ax.set_ylim(-0.05, 1.05)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=300)
+    plt.close(fig)
+
+def canonicalize_condition(cond):
+    """Combine left/right rotation and spiral directions"""
+    cond = str(cond)
+    lower = cond.lower()
+    if lower.startswith("rotation"):
+        return "Rotation"
+    if lower.startswith("spiral"):
+        return "Spiral"
+    if lower.startswith("forward"):
+        return "Forward"
+    if lower.startswith("random"):
+        return "Random"
+    return cond
 
 def load_subject_data(subject):
     file_path = (
@@ -170,22 +256,39 @@ def load_subject_data(subject):
         print(f"Missing file, skipping: {file_path}")
         return None
 
-    df = pd.read_csv(file_path)
-    df = df[
-        df["event"].astype(str).str.startswith("COMPARE_TO_MEAN_RESULT")
-    ].copy()
+    raw = pd.read_csv(file_path)
+    result_mask = raw["event"].astype(str).str.startswith(
+        "COMPARE_TO_MEAN_RESULT"
+    )
+    df = raw.loc[result_mask].copy()
+    n_result_events = len(df)
 
     parsed = df["event"].apply(parse_compare_event)
     parsed_df = pd.DataFrame(parsed.tolist())
+    n_parse_failed = int(parsed_df.get("response", pd.Series(index=df.index, dtype=object)).isna().sum())
 
-    df = pd.concat([df.reset_index(drop=True), parsed_df], axis=1)
+    df = pd.concat([df.reset_index(drop=True), parsed_df.reset_index(drop=True)], axis=1)
+    before_drop = len(df)
     df = df.dropna(subset=["response", "currSpeedVal", "cond"]).copy()
+    n_dropped_required = before_drop - len(df)
 
+    valid_response = df["response"].isin(["FASTER", "SLOWER"])
+    n_invalid_response = int((~valid_response).sum())
+    df = df.loc[valid_response].copy()
+
+    df["condition_raw"] = df["cond"]
+    df["cond"] = df["cond"].map(canonicalize_condition)
     df["subject"] = subject
     df["answered_faster"] = (df["response"] == "FASTER").astype(int)
 
-    return df
+    print(
+        f"{subject}: result_events={n_result_events}, "
+        f"parse_failures={n_parse_failed}, "
+        f"dropped_missing_fields={n_dropped_required}, "
+        f"invalid_responses={n_invalid_response}, retained={len(df)}"
+    )
 
+    return df
 
 def main():
     parser = argparse.ArgumentParser()
@@ -238,6 +341,24 @@ def main():
 
     print(summary_cond)
 
+    print("\n=== Total retained trials by condition ===")
+    condition_totals = (
+        data.groupby("cond")
+        .agg(
+            n_trials=("answered_faster", "size"),
+            n_subjects=("subject", "nunique"),
+        )
+        .sort_index()
+    )
+    print(condition_totals)
+
+    print("\n=== Retained trials by subject and condition ===")
+    subject_condition_counts = pd.crosstab(data["subject"], data["cond"])
+    print(subject_condition_counts.to_string())
+    subject_condition_counts.to_csv(
+        GROUP_OUT / "trial_counts_by_subject_and_condition.csv"
+    )
+
     slowest = data["currSpeedVal"].min()
 
     print(f"\n=== Slowest speed ({slowest}) ===")
@@ -283,7 +404,7 @@ def main():
     if subject is None:
         plot_psychometric(
             data,
-            title="Group psychometric curve",
+            title="Group speed judgments by optic flow condition",
             out_path=GROUP_OUT / "group_psychometric_curve.png",
         )
 
@@ -291,7 +412,6 @@ def main():
 
     print("Done.")
     print(f"Subject outputs saved to: {PROJECT_ROOT / 'output' / 'sub-XXX'}")
-
 
 if __name__ == "__main__":
     main()
