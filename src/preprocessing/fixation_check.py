@@ -416,11 +416,75 @@ def main():
     
     if summary_rows:
         summary = pd.DataFrame(summary_rows)
+        print("\n" + "=" * 80)
+        print("FIXATION QC SUMMARY")
+        print("=" * 80)
+        print(
+            summary.to_string(
+                index=False,
+                formatters={
+                    "percent_rejected": "{:.2f}".format,
+                    "median_p95_deg": "{:.2f}".format,
+                },
+            )
+        )
 
-        summary_file = OUT_ROOT / "fixation_qc_summary.csv"
-        summary.to_csv(summary_file, index=False)
+        group_stats = pd.DataFrame(
+            {
+                "measure": [
+                    "Percent of trials rejected",
+                    "Median trial-level p95 distance (deg)",
+                ],
+                "mean": [
+                    summary["percent_rejected"].mean(),
+                    summary["median_p95_deg"].mean(),
+                ],
+                "sd": [
+                    summary["percent_rejected"].std(ddof=1),
+                    summary["median_p95_deg"].std(ddof=1),
+                ],
+                "min": [
+                    summary["percent_rejected"].min(),
+                    summary["median_p95_deg"].min(),
+                ],
+                "max": [
+                    summary["percent_rejected"].max(),
+                    summary["median_p95_deg"].max(),
+                ],
+                "n_subjects": [
+                    summary["percent_rejected"].notna().sum(),
+                    summary["median_p95_deg"].notna().sum(),
+                ],
+            }
+        )
 
-        print(f"\nSaved fixation QC summary:\n  {summary_file}")
+        print("\nGROUP STATISTICS")
+        print(
+            group_stats.to_string(
+                index=False,
+                float_format=lambda value: f"{value:.2f}",
+            )
+        )
+
+        if subject is None:
+            summary_file = OUT_ROOT / "fixation_qc_summary.csv"
+            stats_file = OUT_ROOT / "fixation_qc_group_statistics.csv"
+
+            summary.to_csv(summary_file, index=False)
+            group_stats.to_csv(stats_file, index=False)
+
+            print(f"\nSaved subject-level summary:\n  {summary_file}")
+            print(f"Saved group statistics:\n  {stats_file}")
+        else:
+            subject_summary_file = (
+                OUT_ROOT / f"{subject}_fixation_qc_summary.csv"
+            )
+            summary.to_csv(subject_summary_file, index=False)
+
+            print(
+                "\nSingle-subject run: the complete group summary was not overwritten."
+            )
+            print(f"Saved subject summary:\n  {subject_summary_file}")
 
     print("\nDone.")
 

@@ -74,22 +74,22 @@ const COEFFICIENTS = [
     "spl(speed,4)",
 
     # Random x spline
-    # "condition: Random & spl(speed,1)",
-    # "condition: Random & spl(speed,2)",
-    # "condition: Random & spl(speed,3)",
-    # "condition: Random & spl(speed,4)",
+    "condition: Random & spl(speed,1)",
+    "condition: Random & spl(speed,2)",
+    "condition: Random & spl(speed,3)",
+    "condition: Random & spl(speed,4)",
 
     # Rotation x spline
-    # "condition: Rotation & spl(speed,1)",
-    # "condition: Rotation & spl(speed,2)",
-    # "condition: Rotation & spl(speed,3)",
-    # "condition: Rotation & spl(speed,4)",
+    "condition: Rotation & spl(speed,1)",
+    "condition: Rotation & spl(speed,2)",
+    "condition: Rotation & spl(speed,3)",
+    "condition: Rotation & spl(speed,4)",
 
     # Spiral x spline
-    # "condition: Spiral & spl(speed,1)",
-    # "condition: Spiral & spl(speed,2)",
-    # "condition: Spiral & spl(speed,3)",
-    # "condition: Spiral & spl(speed,4)",
+    "condition: Spiral & spl(speed,1)",
+    "condition: Spiral & spl(speed,2)",
+    "condition: Spiral & spl(speed,3)",
+    "condition: Spiral & spl(speed,4)",
 ]
 
 const np = pyimport("numpy")
@@ -241,7 +241,7 @@ function plot_cluster_mask(
     size(cluster_mask) == size(T_obs) ||
         error("Cluster mask and T_obs have different dimensions.")
 
-    # Show only t-values belonging to this cluster.
+    # Show only t-values belonging to this cluster
     masked_t = fill(NaN, size(T_obs))
     masked_t[cluster_mask] .= T_obs[cluster_mask]
 
@@ -251,7 +251,7 @@ function plot_cluster_mask(
 
     colour_limit = maximum(abs, cluster_values)
 
-    # Avoid a zero-width colour range.
+    # Avoid a zero-width colour range
     colour_limit =
         colour_limit == 0 ? 1.0 : colour_limit
 

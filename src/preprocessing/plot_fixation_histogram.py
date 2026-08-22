@@ -6,7 +6,7 @@ import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-FIX_ROOT = PROJECT_ROOT / "output"
+FIX_ROOT = PROJECT_ROOT / "output-iclabel" / "fixation-iclabel"
 
 all_data = []
 
@@ -51,8 +51,8 @@ plt.legend()
 
 out = (
     PROJECT_ROOT
-    / "output"
-    / "fixation"
+    / "output-iclabel"
+    / "fixation-iclabel"
     / "fixation_p95_histogram.png"
 )
 

@@ -56,7 +56,7 @@ condition_levels = [
     "Spiral",
 ]
 
-f = @formula(0 ~ 1 + condition + spl(speed, 5))
+f = @formula(0 ~ 1 + condition * spl(speed, 5))
 
 summary_rows = DataFrame(
     subject = String[],
