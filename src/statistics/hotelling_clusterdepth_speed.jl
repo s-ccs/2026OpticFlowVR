@@ -33,9 +33,14 @@ const OUT_ROOT = joinpath(
 mkpath(OUT_ROOT)
 
 const POSTERIOR_ROI = [
-    "P7", "P5", "P3", "P1", "Pz", "P2", "P4", "P6", "P8",
-    "PO7", "PO3", "POz", "PO4", "PO8",
-    "O1", "Oz", "O2",
+    "O1",
+    "O2",
+    "Oz",
+    "POz",
+    "PO3",
+    "PO4",
+    "PO7",
+    "PO8",
 ]
 
 const TIME_MIN = 0.100
